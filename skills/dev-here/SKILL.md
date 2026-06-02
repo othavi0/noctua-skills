@@ -114,13 +114,14 @@ Reporte curto: porta, log, `TARGET_TAB_ID`, Monitor armado. Pare.
 - **Passos previsíveis → `browser_batch`.** Encadeie ações conhecidas (`navigate`+`read_page`,
   `form_input` em vários refs, click+type+press) numa só chamada e corte round-trips. Ele **não
   passa saída→entrada**: se o próximo passo depende de um ref que você só descobre agora, vá normal.
-- **Erros têm dois lados.** O Monitor vê só o **log do server** (stdout). Erros **client-side**
-  (React, `fetch` 4xx/5xx, exceção no browser) aparecem no **console**, não no log →
-  `read_console_messages` (`onlyErrors`) e `read_network_requests` na aba. O Monitor não pega isso.
-- **Cookies/storage.** `javascript_tool` lê `localStorage`/`sessionStorage` e cookies
-  **não-HttpOnly** direto, sem atrito. Cookie de sessão **HttpOnly** (auth) o JS não enxerga → só
-  `agent-browser cookies get` (CDP), que exige reabrir o Brave em `--remote-debugging-port`
-  (atrito — use só quando precisa mesmo do HttpOnly).
+- **Server é vigiado; client é sob demanda.** O Monitor é passivo e te avisa sozinho — mas só
+  do **log do server** (stdout). O lado **client** (React, `fetch` 4xx/5xx, exceção no browser)
+  vive no **console do browser**, que o shell não consegue observar → **não há notificação
+  automática**. Pra ver, rode `read_console_messages` (`onlyErrors`)/`read_network_requests` na
+  aba **quando** a tela parecer quebrada ou uma ação falhar — não conte com aviso espontâneo.
+- **Storage/cookies.** `javascript_tool` lê `localStorage`/`sessionStorage` e cookies
+  não-HttpOnly direto. Cookie de sessão **HttpOnly** o JS não enxerga — e ver isso exigiria
+  CDP/debug port, que abandonaria este setup; então fica fora do alcance da skill.
 
 ## Encerrar
 
