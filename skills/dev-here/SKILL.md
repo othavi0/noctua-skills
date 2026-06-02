@@ -107,6 +107,20 @@ Reporte curto: porta, log, `TARGET_TAB_ID`, Monitor armado. Pare.
 - **Confirme a URL ao conectar**, depois use o `tab_id` direto; re-valide só se uma ação falhar.
 - **Nunca** aja numa aba `localhost:<outra-porta>` — são de outros projetos/instâncias.
 - Abas que não são a sua não são problema seu — não as toque, não as bloqueie.
+## Interagir e debugar a aba (depois do setup)
+
+- **Texto > print.** Pra inspecionar/clicar, use `find` ou `read_page` (`filter=interactive`) —
+  barato e dá refs. Screenshot (~1,5k tok, só viewport, sem refs) só pro visual (layout/CSS/render).
+- **Passos previsíveis → `browser_batch`.** Encadeie ações conhecidas (`navigate`+`read_page`,
+  `form_input` em vários refs, click+type+press) numa só chamada e corte round-trips. Ele **não
+  passa saída→entrada**: se o próximo passo depende de um ref que você só descobre agora, vá normal.
+- **Erros têm dois lados.** O Monitor vê só o **log do server** (stdout). Erros **client-side**
+  (React, `fetch` 4xx/5xx, exceção no browser) aparecem no **console**, não no log →
+  `read_console_messages` (`onlyErrors`) e `read_network_requests` na aba. O Monitor não pega isso.
+- **Cookies/storage.** `javascript_tool` lê `localStorage`/`sessionStorage` e cookies
+  **não-HttpOnly** direto, sem atrito. Cookie de sessão **HttpOnly** (auth) o JS não enxerga → só
+  `agent-browser cookies get` (CDP), que exige reabrir o Brave em `--remote-debugging-port`
+  (atrito — use só quando precisa mesmo do HttpOnly).
 
 ## Encerrar
 
