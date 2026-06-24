@@ -32,15 +32,15 @@ Quando receber texto para humanizar:
 4. **Mantenha o registro** — formal, técnico, casual, conforme contexto
 5. **Injete voz** — limpar não basta; texto sem alma também parece IA
 
-## Quando ler `patterns-pt-br.md`
+## Quando ler `references/patterns-pt-br.md`
 
-A referência detalhada com 30+ padrões e exemplos antes/depois fica em `patterns-pt-br.md` (~9k tokens). Carregue-a quando:
+A referência detalhada com 30+ padrões e exemplos antes/depois fica em `references/patterns-pt-br.md` (~9k tokens). Carregue-a quando:
 
 - Você vai de fato reescrever prosa em PT-BR (não só responder uma pergunta sobre a skill)
 - Precisa consultar exemplos concretos de um padrão específico
 - Vai aplicar o checklist final ou o sistema de pontuação
 
-**Contexto apertado?** Delegue para um subagente: passe o draft + `patterns-pt-br.md` e peça a revisão de volta.
+**Contexto apertado?** Delegue para um subagente: passe o draft + `references/patterns-pt-br.md` e peça a revisão de volta.
 
 ## Cinco regras-mestras
 
@@ -137,4 +137,4 @@ Se o usuário pediu apenas para "revisar" sem reescrever, sinalize os padrões e
 
 ---
 
-**Detalhamento completo, exemplos antes/depois para cada padrão, e a análise de comparação com humanizer-zh:** `patterns-pt-br.md`.
+**Detalhamento completo, exemplos antes/depois para cada padrão, e a análise de comparação com humanizer-zh:** `references/patterns-pt-br.md`.

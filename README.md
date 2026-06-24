@@ -2,61 +2,81 @@
 
 [![skills.sh](https://skills.sh/b/othavi0/skills)](https://skills.sh/othavi0/skills)
 
-Claude Code skills I actually use, packaged to drop into any project. Curated,
-not exhaustive: each one earns its place or it is cut.
+A small set of Claude Code skills I actually use, packaged to drop into any
+project. Curated, not exhaustive — each one earns its place or it gets cut.
 
-A skill is a folder with a `SKILL.md` (YAML frontmatter + instructions). Claude
-Code reads the `description` to decide when to trigger; the body guides the run.
-Heavier material loads on demand from a `references/` folder, so the trigger
-stays cheap.
+A skill is a folder with a `SKILL.md`: YAML frontmatter plus instructions. Claude
+Code reads the `description` to decide when to reach for it; the body guides the
+run. Heavier material loads on demand from a `references/` folder, so the trigger
+stays cheap. They're small, composable, and model-agnostic — fork them, rename
+them, make them yours.
 
-## Install
+## Quickstart
 
-The fast path is the [skills.sh](https://skills.sh) CLI — no clone, no copy:
+1. Install with the [skills.sh](https://skills.sh) CLI:
 
-```bash
-# all of them, into the current project
-npx skills@latest add othavi0/skills
+   ```bash
+   npx skills@latest add othavi0/skills
+   ```
 
-# globally, for every project
-npx skills@latest add othavi0/skills --global
+2. Pick the skills and the agents you want them on. Add `--global` to install for
+   every project, or `-s dev-up` for just one.
 
-# or just one
-npx skills@latest add othavi0/skills -s dev-up
-```
+3. Run `/reload-skills` (or restart Claude Code).
 
-Prefer to do it by hand? Skills live in `~/.claude/skills` (global) or
-`.claude/skills` (one project) — copy the ones you want:
+4. Invoke by slash command, or let the model-invoked ones trigger on their own.
 
-```bash
-git clone https://github.com/othavi0/skills noctua-skills
-cp -r noctua-skills/skills/engineering/dev-up ~/.claude/skills/
-```
+## Why these exist
 
-Either way, run `/reload-skills` (or restart Claude Code) afterwards. Invoke a
-skill by its slash command, or let the model-invocable ones trigger on their own.
+Each one came out of a real friction, not a "wouldn't it be neat" idea.
 
-## The skills
+**Dev servers that trip over each other.** Run a few projects at once and the
+terminals blur together — which tab is which port, who threw that error. `dev-up`
+pins one browser tab to a chosen port, arms an error watcher, and stays out of the
+way of everything else already running.
+
+**`CLAUDE.md` that bloats into noise.** Project memory grows by accretion: paths
+that moved, commands that changed, advice the code already enforces.
+`claude-md-prune` runs the Boris Cherny / Anthropic filter — *"would removing this
+cause Claude to make mistakes? If not, cut it"* — and flags the lines that drifted
+out of sync with the code.
+
+**Prose that reads like a machine wrote it.** Portuguese text from an LLM carries
+tells: inflated vocabulary, negative parallelism, sycophancy, em-dashes
+everywhere. `humanize-pt-br` strips 30+ verified patterns — Wikipedia's *Signs of
+AI writing* adapted to PT-BR, plus Strunk.
+
+## Reference
+
+Skills split on one axis: who can invoke them. **User-invoked** skills run only
+when you type them (e.g. `/dev-up`) — they orchestrate. **Model-invoked** skills
+can be called by you *or* reached for automatically when the task fits — they hold
+the reusable discipline.
 
 ### Engineering
 
-- **[dev-up](./skills/engineering/dev-up/SKILL.md)** — `/dev-up <port>` — starts the
-  current folder's dev server on a chosen port, opens one browser tab pinned to that
-  port, and arms an error watcher, then hands control back. Built for running several
-  servers and tabs in parallel without disturbing them. First run on a machine
-  bootstraps the claude-in-chrome connection itself.
-- **[claude-md-prune](./skills/engineering/claude-md-prune/SKILL.md)** — *auto* — subtractive
-  audit of `CLAUDE.md`: cuts derivable content and flags drift (paths, commands, ADRs no
-  longer matching the code), following the Boris Cherny / Anthropic filter — *"would
-  removing this cause Claude to make mistakes? If not, cut it."* Triggers when you mention
-  trimming or auditing `CLAUDE.md`.
+**User-invoked**
+
+- **[dev-up](./skills/engineering/dev-up/SKILL.md)** — `/dev-up <port>` — start this
+  folder's dev server on a port, open one pinned browser tab, arm an error watcher,
+  hand control back. Built for running several servers and tabs in parallel without
+  disturbing them. First run on a machine bootstraps the claude-in-chrome connection
+  itself.
+
+**Model-invoked**
+
+- **[claude-md-prune](./skills/engineering/claude-md-prune/SKILL.md)** — subtractive
+  audit of `CLAUDE.md`: cut derivable content, flag drift (paths, commands, ADRs no
+  longer matching the code). Triggers when you mention trimming or auditing `CLAUDE.md`.
 
 ### Writing
 
-- **[humanize-pt-br](./skills/writing/humanize-pt-br/SKILL.md)** — *auto* — removes AI tells
-  from Brazilian-Portuguese prose: 30+ verified patterns (inflated vocabulary, formulaic
-  triggers, impersonal passive, negative parallelism, sycophancy). Wikipedia's *Signs of AI
-  writing* adapted to PT-BR, plus Strunk. Triggers when editing PT-BR prose.
+**Model-invoked**
+
+- **[humanize-pt-br](./skills/writing/humanize-pt-br/SKILL.md)** — remove AI tells from
+  Brazilian-Portuguese prose: 30+ verified patterns (inflated vocabulary, impersonal
+  passive, negative parallelism, sycophancy). Scoped to Read / Write / Edit, and
+  Portuguese-only by design.
 
 ## Structure
 
@@ -66,13 +86,13 @@ skills/
     claude-md-prune/   SKILL.md + references/
     dev-up/            SKILL.md + references/
   writing/
-    humanize-pt-br/    SKILL.md + patterns-pt-br.md
+    humanize-pt-br/    SKILL.md + references/
 ```
 
 ## Notes
 
-- `dev-up` needs the [claude-in-chrome](https://docs.claude.com/en/docs/claude-code) browser connection — on the first run on a machine it walks through the one-time setup itself (`references/setup.md`), no separate command.
-- `humanize-pt-br` is scoped to Read / Write / Edit and is Portuguese-only by design.
+- `dev-up` needs the [claude-in-chrome](https://docs.claude.com/en/docs/claude-code) browser connection — on first run it walks through the one-time setup itself (`references/setup.md`), no separate command.
+- Prefer to install by hand? Clone and copy a skill folder into `~/.claude/skills` (global) or `.claude/skills` (one project), then `/reload-skills`.
 
 ---
 
