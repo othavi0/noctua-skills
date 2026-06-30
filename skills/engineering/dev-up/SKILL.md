@@ -13,11 +13,12 @@ Pins one dev server to one **port**, opens one browser **tab** you own at that p
 **watcher** on the log — so you can hand control back and walk away. The port is the source of
 truth: the server binds it, the tab navigates to it, the watcher follows it.
 
-When several copies of a project run side by side (sibling worktrees, or multiple Claude
-instances sharing one `claude-in-chrome` MCP tab group), that one-tab discipline is what stops
-you from clicking another session's tab. Those isolation rules live in
-[`references/coexistence.md`](references/coexistence.md) — read it the moment step 4 shows **more
-than one browser, or other `localhost` tabs in the group**.
+Each Claude Code session now gets its **own** `claude-in-chrome` tab group (the extension scopes
+groups per session), so you no longer share one with other instances — but you can still collect
+**several `localhost` tabs inside your own group** (ran `dev-up` twice, dragged a tab in), and the
+shutdown last-tab hazard is real. That one-tab discipline, and what changed about group sharing,
+live in [`references/coexistence.md`](references/coexistence.md) — read it the moment step 4 shows
+**other `localhost` tabs already in the group**.
 
 First time on this machine (extension not installed, or no browser connected)? Step 4 detects it and
 walks you through the one-time setup — see [`references/setup.md`](references/setup.md). No separate
@@ -94,8 +95,9 @@ handback.
 
 **Load the deferred tools you'll need now, in one `ToolSearch`** — `Monitor`, `PushNotification`,
 `TaskStop`, and the `claude-in-chrome` set (`list_connected_browsers`, `select_browser`,
-`switch_browser`, `tabs_context_mcp`, `tabs_create_mcp`, `navigate`, `read_page`). Every run needs
-them; a second `ToolSearch` later for one you skipped is a wasted round-trip.
+`switch_browser`, `tabs_context_mcp`, `tabs_create_mcp`, `navigate`, `read_page`,
+`read_console_messages`, `read_network_requests`). The last two are for step 4's smoke-check; every
+run needs all of them, and a second `ToolSearch` later for one you skipped is a wasted round-trip.
 
 One Monitor, persistent, filtering the log for trouble:
 
@@ -165,17 +167,17 @@ stabilises instead of spamming.
        printf 'deviceId=%s\nname=%s\n' "<chosen deviceId>" "<chosen name>" > "$D/browser"
        ```
 
-     Wrong browser later, or want to re-pick? `rm ~/.config/dev-up/browser` and it asks again. More
-     than one browser also means a shared group → read
-     [`references/coexistence.md`](references/coexistence.md) now.
+     Wrong browser later, or want to re-pick? `rm ~/.config/dev-up/browser` and it asks again.
+     (Multiple connected browsers just means multiple devices to choose between — **not** a shared
+     group; each session has its own. See [`references/coexistence.md`](references/coexistence.md).)
 2. **Find or create the tab.** `tabs_context_mcp` (`createIfEmpty: true`): reuse an existing tab on
    `localhost:PORT`, else `tabs_create_mcp`, then `navigate` to **`http://localhost:PORT` — the
    root, not a deep route** (try `https://` if it won't load). Root surfaces any login redirect
    whatever route the app lands on, so you catch auth before going deeper; navigating straight to a
    protected sub-path on first load can 307 into a Chrome error page that then blocks every
    `claude-in-chrome` call. Once the root's confirmed, navigate on to the route you actually need.
-   If the context shows **other `localhost:<port>` tabs**, you're in a shared group →
-   [`references/coexistence.md`](references/coexistence.md).
+   If the context shows **other `localhost:<port>` tabs** already in your group (you, earlier — not
+   another instance) → [`references/coexistence.md`](references/coexistence.md).
 3. **Record the `tab_id` as `TARGET_TAB_ID`** — the one tab you own.
 4. **Confirm the final URL — don't trust `navigate`'s return** (it sometimes reports the old
    `chrome://newtab/` before the nav settles). Re-check with `tabs_context_mcp` or `read_page` —
@@ -184,6 +186,17 @@ stabilises instead of spamming.
    redirected to login (`/login`, `/auth`, `/sign-in`, `/entrar`, `/acesso`, `/conta` …), **stop and
    ask the user to log in** — you never enter credentials; continue once they confirm. (URL
    unchanged but the screen differs → a client-side hydration redirect, not auth; treat as loaded.)
+5. **Smoke-check the client — once, before handback.** The watcher (step 3) only sees the
+   **server** log; a client-side boot failure — a thrown render, a `fetch` 4xx/5xx, a failed JS
+   chunk — never reaches stdout, so **nothing alerts you later**. With the route settled, read the
+   browser side **once** on `TARGET_TAB_ID`: `read_console_messages`
+   (`onlyErrors: true`, `pattern: "error|failed|exception"`) and `read_network_requests`
+   (`urlPattern: "/api"`, or the app's data origin). Clean → say so in the handback. A real boot
+   error → fold it into the handback (and `PushNotification` if you've already walked away); a lone
+   transient (one aborted HMR fetch, a third-party blip) isn't actionable — don't push on it. This
+   is a **one-shot snapshot, not a watcher** — the console can't be tailed in the background, so
+   `read_console_messages` requires a `pattern` and you re-run it on demand later
+   ([`references/interacting.md`](references/interacting.md)).
 
 ### 5. Hand control back
 
@@ -192,7 +205,8 @@ task id plus *"persistent — runs until TaskStop or session end"*. That return 
 it, the watcher's live; errored or no task id, re-arm before reporting. **Don't reach for `TaskList`
 to check** — a Monitor is a background process and never appears there, so `TaskList` always says
 "No tasks found" and the gate looks falsely failed (which only tempts you to skip it). Then report:
-port, log path, `TARGET_TAB_ID`, Monitor task id. Stop.
+port, log path, `TARGET_TAB_ID`, Monitor task id, and the **client smoke-check result** (clean, or
+the boot error step 4 surfaced). Stop.
 
 ## After setup
 
