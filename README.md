@@ -99,7 +99,19 @@ skills/
     dev-up/            SKILL.md + references/
   writing/
     humanize-pt-br/    SKILL.md + references/
+docs/                  Operational runbooks (not skills)
+  omarchy/
+    davinci-resolve.md Install / hybrid GPU / launcher on Omarchy
 ```
+
+## Useful docs
+
+Runbooks that are **not** agent skills — reinstall recipes, desktop workarounds,
+“how do I do this again in six months”:
+
+- **[docs/](./docs/README.md)** — index  
+- **[DaVinci Resolve on Omarchy](./docs/omarchy/davinci-resolve.md)** — AUR manual zip,
+  Intel+NVIDIA hybrid GPU, wrapper + Super+Space `.desktop`, lockfile/zombie fixes
 
 ## Notes
 
