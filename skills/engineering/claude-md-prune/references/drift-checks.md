@@ -2,6 +2,14 @@
 
 The drift detection phase is often more valuable than the cutting phase: silent drift (doc says X, code says Y) leads Claude to apply rules that don't exist anymore. This file lists the universal checks; parallelize them across the doc.
 
+## Contents
+
+- How to read a CLAUDE.md for claims (the 10 claim types)
+- Universal manifest detection (table per stack)
+- Common drift patterns to flag (patterns 1-8)
+- Parallelization
+- What to do with drift findings
+
 ## How to read a CLAUDE.md for claims
 
 Pass through the doc and extract every claim that mentions a specific artifact in the code:
@@ -18,6 +26,8 @@ Pass through the doc and extract every claim that mentions a specific artifact i
 | ADR / doc reference | "see ADR-0006" | Does the ADR exist? Has a later ADR superseded it? |
 | Workflow step | "`bun db:sync` after editing schema" | Does the script exist? Does its current implementation match the description? |
 | Configuration value | "`bodySizeLimit = '5mb'`" | Read the config file — same value? |
+
+Patterns #1-#6 below elaborate the File path, Command, Enum/constant, ADR, Library, and Env var rows with symptom/check/fix detail. The remaining rows — Function/method, Type/interface, Workflow step, Configuration value — have no dedicated pattern; this table is their authority.
 
 For each claim that fails verification, record:
 

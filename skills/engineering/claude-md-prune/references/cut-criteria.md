@@ -4,6 +4,21 @@ Content categories that Claude can infer from the code or from generic language 
 
 When showing the user **why** a section is being cut, cite the specific category here so the reasoning is consistent across the audit.
 
+## Contents
+
+1. Stack / dependency lists
+2. Directory structure trees
+3. Command listings
+4. Environment variable lists
+5. Architecture explainers
+6. Per-folder descriptions
+7. Tutorials and onboarding instructions
+8. Generic best practices Claude already knows
+9. Generic linter rules
+10. Long verbose explanations
+
+Plus the summary heuristic at the end.
+
 ## 1. Stack / dependency lists
 
 A list of frameworks, libraries, and versions used by the project.

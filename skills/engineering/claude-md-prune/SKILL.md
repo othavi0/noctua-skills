@@ -1,11 +1,15 @@
 ---
 name: claude-md-prune
-description: Audit and aggressively prune existing CLAUDE.md files following the Boris Cherny + Anthropic canonical filter ("would removing this cause Claude to make mistakes? If not, cut it"). Detects drift between docs and code (paths, commands, enums, ADRs no longer matching reality). Use whenever the user mentions CLAUDE.md being too long, bloated, stale, outdated, or wants to refactor/audit/trim/refine/prune/shrink CLAUDE.md files. Also triggers when the user says Claude is ignoring CLAUDE.md instructions, when CLAUDE.md exceeds ~200 lines, when there is evidence of drift between docs and code, or when the user asks for "Boris-style", "mistakes-only", or "minimal" CLAUDE.md. Subtractive audit (cuts derivable content + flags factual errors); complementary to claude-md-improver (which is additive). Works on any project, any language, any stack.
+description: >-
+  Prune, audit, or trim a bloated, stale, or drifted CLAUDE.md. Use when the user calls
+  CLAUDE.md too long, bloated, or outdated; says Claude is ignoring CLAUDE.md; when the
+  file exceeds ~200 lines; or asks for a "Boris-style", "mistakes-only", or "minimal"
+  CLAUDE.md. Also flags drift: paths, commands, enums, ADRs that no longer match the code.
 ---
 
 # CLAUDE.md Prune — Subtractive Audit
 
-This skill aggressively removes content from CLAUDE.md files that Claude can already infer from the code, and flags claims in the doc that no longer match reality. It is the **opposite axis** of `claude-md-improver` — that one adds what's missing; this one removes what shouldn't be there.
+This skill aggressively removes content from CLAUDE.md files that Claude can already infer from the code, and flags claims in the doc that no longer match reality. It is **subtractive only** — additions are out of scope; when a rule is missing, flag it in the report instead of writing it.
 
 ## Why this skill exists
 
@@ -27,6 +31,8 @@ Two sources converge on the same operational philosophy:
 
 The CLAUDE.md is **advisory (~70-80% adherence)**. For rules that must execute 100% of the time, use a **hook** instead. The longer the file, the more individual rules dilute and adherence drops. This skill restores signal-to-noise.
 
+Claude Code's built-in `/doctor` also proposes trimming derivable CLAUDE.md content (2.1.206+), but as a single pass: no drift fact-checking, no per-file approval. This skill is the structured version — the drift detection in Phase 2 is what the built-in check doesn't do.
+
 ## When to trigger
 
 Trigger on any of these:
@@ -38,25 +44,16 @@ Trigger on any of these:
 - User asks for a project audit or documentation audit and CLAUDE.md files exist
 - During unrelated work, you notice a CLAUDE.md file is > 200 lines AND has obvious derivable content (stack lists, directory trees, command listings) — proactively offer.
 
-**Do NOT trigger** when the user wants to:
+**Out of scope** — do not trigger when the user wants to:
 
-- ADD content to CLAUDE.md → use `claude-md-improver`
-- Capture session learnings → use `/revise-claude-md` command
-- Generate a CLAUDE.md from scratch → use `claude-md-improver` templates
+- ADD content to CLAUDE.md, or generate one from scratch — if a complementary add-skill (e.g. `claude-md-improver`) is installed, route there; otherwise flag what's missing in the report and stop
+- Capture end-of-session learnings into CLAUDE.md — that's a capture workflow, not an audit
 
-## What this skill does vs sibling skills
-
-| Skill | Direction | When |
-|---|---|---|
-| `claude-md-improver` | **ADD** | Audit quality, propose additions, A-F grade |
-| `/revise-claude-md` (command) | **CAPTURE** | End-of-session learnings into CLAUDE.md |
-| `claude-md-prune` (this) | **REMOVE + FACT-CHECK** | Cut derivable content; flag drift between docs and code |
-
-The three are complementary. Run `claude-md-prune` periodically (every 1-3 months, or whenever a CLAUDE.md grows beyond ~200 lines).
+Run this skill periodically (every 1-3 months, or whenever a CLAUDE.md grows beyond ~200 lines).
 
 ## Workflow
 
-Five phases. Always present the report BEFORE applying changes.
+Five phases. Always present the report BEFORE applying changes. On a long audit (monorepo, many files), if the conversation gets compacted mid-run, re-invoke this skill before Phases 4-5 — after compaction only a skill's first ~5k tokens are re-attached, and the tail of this workflow can silently vanish.
 
 ### Phase 1: Discovery
 
@@ -78,20 +75,7 @@ Ask the user to confirm the scope before proceeding. Default: project only.
 
 For each CLAUDE.md, verify that the **claims in the doc still match the code**. This is the most valuable phase — silent drift is a more common failure mode than bloat.
 
-Detect the project's primary manifest file(s) so checks adapt to the stack:
-
-| Manifest | Stack |
-|---|---|
-| `package.json` | JS / TS / Node / Bun |
-| `Cargo.toml` | Rust |
-| `pyproject.toml` / `requirements.txt` / `uv.lock` | Python |
-| `go.mod` | Go |
-| `Gemfile` | Ruby |
-| `pom.xml` / `build.gradle` | Java / Kotlin |
-| `composer.json` | PHP |
-| `mix.exs` | Elixir |
-| `Package.swift` | Swift |
-| `pubspec.yaml` | Dart / Flutter |
+Detect the project's primary manifest file(s) so checks adapt to the stack — the full manifest table per stack lives in `references/drift-checks.md` (single source of truth; it also covers Makefile/justfile/Taskfile).
 
 For each factual claim in the CLAUDE.md, verify:
 
@@ -105,6 +89,8 @@ For each factual claim in the CLAUDE.md, verify:
 Use parallel tool calls (multiple Read/Grep in one message) since these checks are independent.
 
 See `references/drift-checks.md` for the full checklist per stack and example evidence patterns.
+
+Phase 2 is complete only when every claim type in that checklist has been checked against the code for **every** CLAUDE.md in scope — not just until the first drift is found.
 
 ### Phase 3: Categorize content (the Boris filter)
 
@@ -127,10 +113,9 @@ Common patterns to remove:
 - **Architecture descriptions / explainers** (Claude reads the code)
 - **Per-folder descriptions** ("what each folder does")
 - **Tutorials, onboarding instructions** (belongs in README/docs/)
-- **Generic best-practices** Claude already knows ("use TypeScript", "write clean code", "follow REST conventions", "use proper error handling")
+- **Generic best-practices** Claude already knows, including code style that mirrors language/framework defaults (`references/cut-criteria.md` #8)
 - **Generic linter rules** (the linter config exists)
 - **Long verbose explanations** when a one-liner would do
-- **Code style** that mirrors what the language/framework defaults already enforce
 
 See `references/cut-criteria.md` for detailed examples per category.
 
@@ -219,14 +204,14 @@ For each file the user approves, write the new version. Show the new version inl
 After applying:
 
 - Print the final line count reduction (this validates the work and reinforces the habit)
-- Suggest the user re-run this skill periodically (every 1-3 months, or whenever a CLAUDE.md grows above ~200 lines)
+- Suggest the user re-run this skill periodically (every 1-3 months, or whenever a CLAUDE.md grows above ~200 lines) — and offer to create a scheduled task firing this skill on that cadence, so the recurrence doesn't depend on anyone's memory
 - If hook candidates were identified, suggest invoking `update-config` skill to wire them up
 
 ## Anti-instructions
 
 These are the easy ways to misuse the skill — avoid each:
 
-- **Do not add new content.** This skill is subtractive. If you spot a missing rule, flag it in the report but do not write it. Let the user invoke `claude-md-improver` for additions.
+- **Do not add new content.** This skill is subtractive. If you spot a missing rule, flag it in the report but do not write it — if a complementary add-skill is installed, point the user there; otherwise the flag is enough.
 - **Do not invent gotchas.** Only KEEP content that's already in the file. The skill does not generate new project-specific rules from imagination.
 - **Do not cut without asking when unclear.** A rule that looks generic might cover an actual past incident only the user remembers. When in doubt, ask: "Did this line ever fix a real bug?"
 - **Do not touch `~/.claude/CLAUDE.md` (global)** unless the user explicitly opts in. Default scope is the current project.
