@@ -17,6 +17,12 @@ After [`SKILL.md`](../SKILL.md) hands control back, this is how to drive and deb
 - **Predictable steps → `browser_batch`.** Chain known actions (`navigate`+`read_page`,
   `form_input` across several refs, click+type+press) in one call to cut round-trips. It does
   **not** pass output→input: if the next step needs a ref you only discover now, go the normal way.
+  A batch skips the permission prompt only when **every** action in it is read-only — mixing
+  `navigate` (state-changing) with reads keeps the token saving but forfeits the free pass.
+- **Responsive/breakpoint testing: not with this tab.** `resize_window` reports success but under a
+  tiling WM the viewport doesn't actually change (measured on Hyprland: asked for 390px, stayed at
+  2106). For mobile/breakpoint checks, use `agent-browser` with a device profile instead of
+  fighting this tab.
 - **The server is watched; the client is on demand.** The Monitor notifies you on its own — but
   only from the **server log** (stdout). The **client** side (React, `fetch` 4xx/5xx, a browser
   exception) lives in the **browser console**, which the shell can't observe → **no automatic

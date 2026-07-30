@@ -3,8 +3,8 @@ name: dev-up
 description: |
   Use when invoking `/dev-up <port>`, or when asked to start, open, view, run, serve, or monitor
   this project's dev server on a specific port — especially when other servers or browser tabs are
-  already running in parallel and must not be disturbed. Pins one dev server to one port, opens a
-  single browser tab you own at that port, and arms an error watcher before handing control back.
+  already running in parallel and must not be disturbed.
+argument-hint: "[port]"
 ---
 
 # dev-up
@@ -52,7 +52,7 @@ ss -ltn "sport = :PORT" | grep -q LISTEN && echo BUSY || echo FREE
    `pnpm-workspace.yaml`, `nx.json`) the root `dev` starts *every* app — list the workspaces with
    a `dev` script, ask which if there's more than one, and work in that app's dir.
 2. **Override the port.** Command already pins one (`--port N`, `-p N`, `PORT=N`) → swap the
-   number for `PORT`. Doesn't → add the framework's flag (`<bin> --help` or `find-docs` if unsure;
+   number for `PORT`. Doesn't → add the framework's flag (`<bin> --help`, or the `find-docs` skill if installed;
    fallback `PORT=PORT`). Force the exact port where the framework allows (e.g. Vite
    `--strictPort`) so it can't auto-increment onto a neighbour. **Before settling on a port other
    than the app's usual one**, grep env/config for a hardcoded `localhost:<port>` (auth callbacks,
@@ -79,8 +79,10 @@ ss -ltn "sport = :PORT" | grep -q LISTEN && echo BUSY || echo FREE
    until ss -ltn "sport = :PORT" | grep -q LISTEN; do sleep 0.5; done
    ```
 
-   ~20s with no bind → read the log and report. (A first, uncached build can take far longer — if
-   the log says "compiling", keep waiting.) **Bind ≠ ready** for a slow stack (Python/Flask can take
+   Give this Bash call an explicit high `timeout` (up to 600000ms): at the default timeout the
+   harness doesn't fail the loop — it silently auto-backgrounds it, which breaks the very blocking
+   guarantee this step exists for. ~20s with no bind → read the log and report. (A first, uncached
+   build can take far longer — if the log says "compiling", keep waiting.) **Bind ≠ ready** for a slow stack (Python/Flask can take
    15–40s to *serve* after the socket binds): there, a foreground HTTP-readiness poll
    (`curl -s -o /dev/null --retry 60 --retry-connrefused --retry-delay 1 http://localhost:PORT`)
    waits for the app to actually answer, not just bind. A **missing-module / dependency error**, or
@@ -96,8 +98,9 @@ handback.
 **Load the deferred tools you'll need now, in one `ToolSearch`** — `Monitor`, `PushNotification`,
 `TaskStop`, and the `claude-in-chrome` set (`list_connected_browsers`, `select_browser`,
 `switch_browser`, `tabs_context_mcp`, `tabs_create_mcp`, `navigate`, `read_page`,
-`read_console_messages`, `read_network_requests`). The last two are for step 4's smoke-check; every
-run needs all of them, and a second `ToolSearch` later for one you skipped is a wasted round-trip.
+`read_console_messages`, `read_network_requests`, `tabs_close_mcp`). The console/network pair is
+for step 4's smoke-check and `tabs_close_mcp` for shutdown; every run needs all of them, and a
+second `ToolSearch` later for one you skipped is a wasted round-trip.
 
 One Monitor, persistent, filtering the log for trouble:
 
@@ -152,6 +155,9 @@ stabilises instead of spamming.
        hard "you MUST call AskUserQuestion … do not pick one yourself" — that is the *no-cache*
        instruction and does **not** apply on a hit: the user already chose, when the browser was first bound.
        Selecting straight through is the whole point: choose once, then never again.
+       (That covers *this skill's* question only — the extension keeps its own approval modes
+       (Manual/Auto/Skip), so a native permission prompt can still appear; it's not a cache
+       failure.)
      - **Miss** — file absent, or neither the saved deviceId nor name is among the connected devices →
        `AskUserQuestion` listing every browser (name + deviceId), recommending the device marked on
        this computer (`localhost:PORT` only resolves where the server runs). Names may all be generic
@@ -178,10 +184,13 @@ stabilises instead of spamming.
    `claude-in-chrome` call. Once the root's confirmed, navigate on to the route you actually need.
    If the context shows **other `localhost:<port>` tabs** already in your group (you, earlier — not
    another instance) → [`references/coexistence.md`](references/coexistence.md).
+   (`createIfEmpty: true` counts as a state-changing flag — under plan/Manual mode this call may
+   prompt for approval; that's expected, not an error to retry.)
 3. **Record the `tab_id` as `TARGET_TAB_ID`** — the one tab you own.
 4. **Confirm the final URL — don't trust `navigate`'s return** (it sometimes reports the old
-   `chrome://newtab/` before the nav settles). Re-check with `tabs_context_mcp` or `read_page` —
-   **never a screenshot to confirm a URL.** `cic:computer` is the wrong tool here: viewport-only, it
+   `chrome://newtab/` before the nav settles). Re-check with `tabs_context_mcp` — it already
+   carries the tab's URL, far cheaper than `read_page`'s full accessibility tree; fall back to
+   `read_page` only if it's inconclusive. **Never a screenshot to confirm a URL.** `cic:computer` is the wrong tool here: viewport-only, it
    returns no URL text and times out (~30s) while the renderer compiles a first-visit route. If it
    redirected to login (`/login`, `/auth`, `/sign-in`, `/entrar`, `/acesso`, `/conta` …), **stop and
    ask the user to log in** — you never enter credentials; continue once they confirm. (URL
@@ -189,7 +198,8 @@ stabilises instead of spamming.
 5. **Smoke-check the client — once, before handback.** The watcher (step 3) only sees the
    **server** log; a client-side boot failure — a thrown render, a `fetch` 4xx/5xx, a failed JS
    chunk — never reaches stdout, so **nothing alerts you later**. With the route settled, read the
-   browser side **once** on `TARGET_TAB_ID`: `read_console_messages`
+   browser side **once** on `TARGET_TAB_ID`, both calls in one `browser_batch` (two known read-only
+   reads with no output→input dependency — the exact case for batching): `read_console_messages`
    (`onlyErrors: true`, `pattern: "error|failed|exception"`) and `read_network_requests`
    (`urlPattern: "/api"`, or the app's data origin). Clean → say so in the handback. A real boot
    error → fold it into the handback (and `PushNotification` if you've already walked away); a lone

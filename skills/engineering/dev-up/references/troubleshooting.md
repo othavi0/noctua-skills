@@ -50,6 +50,15 @@ retrying:
 - **Stop after ~2 failed `claude-in-chrome` calls** on the same tab and switch to curl + log reads;
   hammering a wedged tab just burns calls (one real run spent six screenshots on a dead CDP link
   before checking the server, which was fine all along).
+- **Calls hang with no clear error at all** (no "Frame … showing error page", no CDP timeout) —
+  suspect a native JS dialog (`alert`/`confirm`/`prompt`, often a `beforeunload` or a delete
+  confirm) open in some tab of the group: dialogs block browser events and Claude stops receiving
+  commands, while curl still returns 200. No MCP call can close a native dialog — ask the user to
+  dismiss it manually, then retry; only after that try a fresh tab or reconnecting the extension.
+- **Every call fails with "Receiving end does not exist"** after the session sat idle — the
+  extension's service worker went idle and dropped the connection (dev-up's exact usage pattern:
+  watcher armed, user walks away, comes back later). It's not the tab nor the server: run
+  `/chrome` and pick **Reconnect extension**, then resume on the same `TARGET_TAB_ID`.
 
 ## Watching a server you didn't start (port-poll fallback)
 
