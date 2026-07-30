@@ -42,11 +42,12 @@ Base: adaptação de [blader/humanizer](https://github.com/blader/humanizer) e [
 25. Negrito decorativo
 26. Listas com cabeçalho em negrito (inline header lists)
 27. Emojis decorativos
+28. Tabelas desnecessárias
 
 **Traços de conversa**
-28. Bajulação e tom servil
-29. Marcas de chatbot ("Espero que ajude!")
-30. Disclaimers de cutoff de conhecimento
+29. Bajulação e tom servil
+30. Marcas de chatbot ("Espero que ajude!")
+31. Disclaimers de cutoff de conhecimento
 
 **Princípios Strunk aplicáveis ao PT-BR**
 
@@ -464,9 +465,27 @@ Base: adaptação de [blader/humanizer](https://github.com/blader/humanizer) e [
 
 ---
 
+### 28. Tabelas desnecessárias
+
+**Padrão:** tabela markdown pequena (2-3 linhas) para informação que seria prosa ou lista natural: "estatísticas-chave", comparação de dois itens, lista de cargos.
+
+**Problema:** Chatbots geram tabelas onde nenhum humano tabularia. Tabela só se justifica com dados genuinamente tabulares: várias linhas E colunas realmente comparáveis. (Padrão expandido na Wikipedia:Signs of AI writing em jul/2026.)
+
+**Antes:**
+> | Métrica | Valor |
+> |---|---|
+> | Fundação | 1994 |
+> | Sede | Curitiba |
+> | Funcionários | 120 |
+
+**Depois:**
+> Fundada em 1994, a empresa tem sede em Curitiba e 120 funcionários.
+
+---
+
 ## Traços de conversa
 
-### 28. Bajulação e tom servil
+### 29. Bajulação e tom servil
 
 **Listar:** "Excelente pergunta!", "Certamente!", "Com toda certeza!", "Você está absolutamente certo!", "Que ótima observação!".
 
@@ -478,7 +497,7 @@ Base: adaptação de [blader/humanizer](https://github.com/blader/humanizer) e [
 
 ---
 
-### 29. Marcas de chatbot
+### 30. Marcas de chatbot
 
 **Listar:** "Espero que isso ajude!", "Claro!", "Com certeza!", "Aqui está…", "Se quiser que eu explique mais alguma coisa, é só pedir!", "Posso elaborar mais se precisar."
 
@@ -490,7 +509,7 @@ Base: adaptação de [blader/humanizer](https://github.com/blader/humanizer) e [
 
 ---
 
-### 30. Disclaimers de cutoff de conhecimento
+### 31. Disclaimers de cutoff de conhecimento
 
 **Listar:** "Até a data do meu último treinamento…", "Com base nas informações disponíveis…", "Embora detalhes específicos sejam limitados…", "Conforme os dados aos quais tenho acesso…".
 
@@ -574,6 +593,7 @@ Antes de entregar o texto:
 - [ ] Algum "fundamental", "crucial", "robusto" gratuito? Substitua por específico ou corte.
 - [ ] Nominalização ("realizou a análise")? Use o verbo direto.
 - [ ] Voz passiva sem agente óbvio? Reescreva ativo.
+- [ ] Tabela pequena que seria prosa? Converta.
 - [ ] Conclusão genérica otimista? Substitua por fato concreto.
 - [ ] Tem voz? Opinião? Ritmo variado? Ou está só limpo e morto?
 
@@ -623,7 +643,7 @@ Avalie de 1 a 10 em cada dimensão (total 50):
 
 - [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing)
 - [blader/humanizer](https://github.com/blader/humanizer)
-- [Strunk — The Elements of Style](../../skills/writing-clearly-and-concisely/elements-of-style.md)
+- Strunk — *The Elements of Style* ([gutenberg.org/ebooks/37134](https://www.gutenberg.org/ebooks/37134))
 - Gazeta do Povo — Clichês de IA em textos de políticos brasileiros
 - Envox — Os maiores vícios de linguagem de IA em 2026
 - Hastewire — Como identificar texto de IA em português
