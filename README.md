@@ -41,12 +41,6 @@ that moved, commands that changed, advice the code already enforces.
 cause Claude to make mistakes? If not, cut it"* — and flags the lines that drifted
 out of sync with the code.
 
-**Reviews that either nitpick or hallucinate.** A single-pass review mixes three different
-questions — does it follow the conventions, does it match the spec, is it actually correct — and
-lets a confident hallucination sit next to a real bug. `code-review` splits the axes into parallel
-sub-agents and puts every bug candidate through an independent verifier with a 0-100 confidence
-rubric; under 80 it dies.
-
 **Prose that reads like a machine wrote it.** Portuguese text from an LLM carries
 tells: inflated vocabulary, negative parallelism, sycophancy, em-dashes
 everywhere. `humanize-pt-br` strips 30+ verified patterns — Wikipedia's *Signs of
@@ -54,35 +48,21 @@ AI writing* adapted to PT-BR, plus Strunk.
 
 ## Reference
 
-Skills split on one axis: who can invoke them. **User-invoked** skills run only
-when you type them (e.g. `/dev-up`) — they orchestrate. **Model-invoked** skills
-can be called by you *or* reached for automatically when the task fits — they hold
-the reusable discipline.
+Every skill here is **model-invoked**: type it as a slash command (`/dev-up 3000`)
+or let Claude reach for it on its own when the task fits its description.
 
 ### Engineering
 
-**User-invoked**
-
-- **[dev-up](./skills/engineering/dev-up/SKILL.md)** — `/dev-up <port>` — start this
-  folder's dev server on a port, open one pinned browser tab, arm an error watcher,
-  hand control back. Built for running several servers and tabs in parallel without
-  disturbing them. First run on a machine bootstraps the claude-in-chrome connection
-  itself.
-
-**Model-invoked**
-
+- **[dev-up](./skills/engineering/dev-up/SKILL.md)** — `/dev-up <port>`, or triggers
+  when you ask to start, view, or monitor this folder's dev server — starts it on a
+  port, opens one pinned browser tab, arms an error watcher, hands control back.
+  Built for running several servers and tabs in parallel without disturbing them.
+  First run on a machine bootstraps the claude-in-chrome connection itself.
 - **[claude-md-prune](./skills/engineering/claude-md-prune/SKILL.md)** — subtractive
   audit of `CLAUDE.md`: cut derivable content, flag drift (paths, commands, ADRs no
   longer matching the code). Triggers when you mention trimming or auditing `CLAUDE.md`.
-- **[code-review](./skills/engineering/code-review/SKILL.md)** — three-axis review of the diff
-  since a fixed point: Standards (repo conventions + a Fowler smell baseline), Spec (does the
-  diff match the originating issue/PRD?), and Bugs (defect hunt with git-history context, every
-  candidate re-judged on a 0-100 confidence rubric — <80 is discarded). Ends with a single
-  ship / fix-first recommendation. Has a cheap single-agent fast path for small diffs.
 
 ### Writing
-
-**Model-invoked**
 
 - **[humanize-pt-br](./skills/writing/humanize-pt-br/SKILL.md)** — remove AI tells from
   Brazilian-Portuguese prose: 30+ verified patterns (inflated vocabulary, impersonal
@@ -95,7 +75,6 @@ the reusable discipline.
 skills/
   engineering/
     claude-md-prune/   SKILL.md + references/
-    code-review/       SKILL.md + references/
     dev-up/            SKILL.md + references/
   writing/
     humanize-pt-br/    SKILL.md + references/
