@@ -17,7 +17,10 @@ resolves there.
 
 Run `switch_browser`. It broadcasts a connection request to every browser with the extension and
 waits (up to 2 min) for the user to click **Connect** in the one they want — and on that screen they
-can **name it** (e.g. `"work Brave"`). Naming is optional: `dev-up` caches the **deviceId** as the
+can **name it** (e.g. `"work Brave"`). With **zero** browsers paired it can instead fail
+immediately with "No other browsers available to switch to" — that's not a dead end: ask the user
+to open the browser and click **Connect** in the extension, then re-poll `list_connected_browsers`
+(cheap) until the device shows up. Don't treat the first error as final. Naming is optional: `dev-up` caches the **deviceId** as the
 durable key (the display name often reverts to a generic `"Browser 1/2/3"`), so an unnamed device is
 fine.
 

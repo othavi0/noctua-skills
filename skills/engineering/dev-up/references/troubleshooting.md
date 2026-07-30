@@ -32,8 +32,13 @@ startup misbehaves.
   pick the port — they gave none — prefer the pinned one and say why in a line.)
 - **The background server dies when the launching process exits or pauses** — notably while it's
   off dispatching long-running subagents. If *you* launched it with `run_in_background` (the normal
-  path), the harness re-invokes you when that task exits, so the death is signalled for free. Just
-  re-check the port (`ss -ltn "sport = :PORT"`) when you come back from long subagent work.
+  path), the harness re-invokes you when that task exits, so the death is signalled for free. When
+  you come back from long subagent work, a session restart, or a context compaction, **restore the
+  whole contract, not just the port**: read `/tmp/dev-up-PORT.state` (written at handback) and
+  verify all four pieces — port listening, server task, watcher alive, `TARGET_TAB_ID` still on the
+  right URL. In audited sessions the server was relaunched while the watcher stayed dead for a day,
+  and a compaction silently swapped the pinned port (5001 → 5000); re-checking only `ss` catches
+  neither.
 
 ## The browser tab shows a Chrome "error page" / `claude-in-chrome` calls fail
 
@@ -59,6 +64,14 @@ retrying:
   extension's service worker went idle and dropped the connection (dev-up's exact usage pattern:
   watcher armed, user walks away, comes back later). It's not the tab nor the server: run
   `/chrome` and pick **Reconnect extension**, then resume on the same `TARGET_TAB_ID`.
+
+## Watcher blocked by "auto mode cannot determine the safety…"
+
+The permission classifier can be temporarily unavailable, failing `Monitor` (or `Bash`) with that
+message. It's an infra hiccup, not a denial: retry the Monitor within the next few actions — not
+only at the end of the cycle — and say in one line that you're temporarily running without a
+watcher. A `Bash` blocked the same way twice in a row → ask the user to run it with the `!` prefix
+instead of retrying blind.
 
 ## Watching a server you didn't start (port-poll fallback)
 

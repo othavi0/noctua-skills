@@ -98,16 +98,21 @@ handback.
 **Load the deferred tools you'll need now, in one `ToolSearch`** — `Monitor`, `PushNotification`,
 `TaskStop`, and the `claude-in-chrome` set (`list_connected_browsers`, `select_browser`,
 `switch_browser`, `tabs_context_mcp`, `tabs_create_mcp`, `navigate`, `read_page`,
-`read_console_messages`, `read_network_requests`, `tabs_close_mcp`). The console/network pair is
-for step 4's smoke-check and `tabs_close_mcp` for shutdown; every run needs all of them, and a
-second `ToolSearch` later for one you skipped is a wasted round-trip.
+`read_console_messages`, `read_network_requests`, `browser_batch`, `tabs_close_mcp`). The
+console/network pair plus `browser_batch` are for step 4's smoke-check and `tabs_close_mcp` for
+shutdown; every run needs all of them, and a second `ToolSearch` later for one you skipped is a
+wasted round-trip.
 
 One Monitor, persistent, filtering the log for trouble:
 
 ```bash
 tail -n 0 -f /tmp/dev-up-PORT.log | grep -E --line-buffered \
-  "[Ee]rror|Exception|Traceback|[Ww]arn|Failed to compile|unhandled|ECONNREFUSED|EADDRINUSE|panic|FATAL"
+  "[Ee]rror|Exception|Traceback|[Ww]arn|Failed to compile|unhandled|ECONNREFUSED|EADDRINUSE|panic|FATAL" \
+  | grep -v --line-buffered "NEXT_REDIRECT"
 ```
+
+(`NEXT_REDIRECT` is Next.js's internal redirect signal, not an error — a documented false positive
+that pushed duplicate alerts in a real run, hence the exclusion.)
 
 `description: "errors on port PORT"`, **`persistent: true`** — that flag is the whole safety: it
 keeps the watcher alive for the entire session, and with it set the Monitor's `timeout_ms` is
@@ -177,7 +182,11 @@ stabilises instead of spamming.
      (Multiple connected browsers just means multiple devices to choose between — **not** a shared
      group; each session has its own. See [`references/coexistence.md`](references/coexistence.md).)
 2. **Find or create the tab.** `tabs_context_mcp` (`createIfEmpty: true`): reuse an existing tab on
-   `localhost:PORT`, else `tabs_create_mcp`, then `navigate` to **`http://localhost:PORT` — the
+   `localhost:PORT`, else `tabs_create_mcp`. **Arm the console/network tracking before
+   navigating**: one throwaway `browser_batch` of `read_console_messages` + `read_network_requests`
+   on the tab — both tools only start recording at their first call, so a reading taken after the
+   navigate is structurally empty (10 of 15 audited runs hit this and burned a re-navigate). Then
+   `navigate` to **`http://localhost:PORT` — the
    root, not a deep route** (try `https://` if it won't load). Root surfaces any login redirect
    whatever route the app lands on, so you catch auth before going deeper; navigating straight to a
    protected sub-path on first load can 307 into a Chrome error page that then blocks every
@@ -199,7 +208,8 @@ stabilises instead of spamming.
    **server** log; a client-side boot failure — a thrown render, a `fetch` 4xx/5xx, a failed JS
    chunk — never reaches stdout, so **nothing alerts you later**. With the route settled, read the
    browser side **once** on `TARGET_TAB_ID`, both calls in one `browser_batch` (two known read-only
-   reads with no output→input dependency — the exact case for batching): `read_console_messages`
+   reads with no output→input dependency — the exact case for batching; the tracking has been
+   recording since you armed it in step 4.2): `read_console_messages`
    (`onlyErrors: true`, `pattern: "error|failed|exception"`) and `read_network_requests`
    (`urlPattern: "/api"`, or the app's data origin). Clean → say so in the handback. A real boot
    error → fold it into the handback (and `PushNotification` if you've already walked away); a lone
@@ -214,7 +224,11 @@ Gate first: the watcher is the contract, and its proof is **the Monitor's own st
 task id plus *"persistent — runs until TaskStop or session end"*. That return **is** the gate: got
 it, the watcher's live; errored or no task id, re-arm before reporting. **Don't reach for `TaskList`
 to check** — a Monitor is a background process and never appears there, so `TaskList` always says
-"No tasks found" and the gate looks falsely failed (which only tempts you to skip it). Then report:
+"No tasks found" and the gate looks falsely failed (which only tempts you to skip it). Persist the
+contract for future turns — `printf 'port=%s\nserver_task=%s\nwatcher_task=%s\ntab_id=%s\n' … >
+/tmp/dev-up-PORT.state` — after a session restart, a context compaction, or long subagent work,
+that file is how you restore the **whole package** (server, watcher, tab), not just re-check the
+port (see [`references/troubleshooting.md`](references/troubleshooting.md)). Then report:
 port, log path, `TARGET_TAB_ID`, Monitor task id, and the **client smoke-check result** (clean, or
 the boot error step 4 surfaced). Stop.
 
@@ -228,7 +242,9 @@ the boot error step 4 surfaced). Stop.
 
 ## Shutting down
 
-When the task is done, **ask whether to shut down**. If yes, in order:
+When the task is done, **ask whether to shut down**. (Running autonomously with no one to answer?
+Assume shutdown once the task is done and say so in the handback — don't skip the gate silently.)
+If yes, in order:
 
 1. `TaskStop` the server's background task (just killing the PID lets a supervisor respawn it).
 2. `TaskStop` the watcher.
@@ -236,6 +252,11 @@ When the task is done, **ask whether to shut down**. If yes, in order:
    kill` would also catch the **browser** attached to the port). If the port keeps coming back,
    an external supervisor is respawning it — tell the user, don't kill blindly.
 4. **Close only `TARGET_TAB_ID`** with `tabs_close_mcp` — never the shared group, never a tab you
-   didn't open. ⚠️ If yours might be the *last* tab in the group, closing it can collapse the whole
-   group; the last-tab hazard and the rest of the shared-group rules are in
-   [`references/coexistence.md`](references/coexistence.md). Then remove the log.
+   didn't open. Match by the **recorded id's value** against the live `tabs_context_mcp` list,
+   never by which tab looks like yours — a recorded id can be silently reused for another URL (a
+   real shutdown closed the wrong tab this way). A "tab group no longer exists" reply is an
+   *inconclusive* state to note in the handback, not proof the environment is clean. ⚠️ If yours
+   might be the *last* tab in the group, closing it can collapse the whole group; the last-tab
+   hazard and the rest of the shared-group rules are in
+   [`references/coexistence.md`](references/coexistence.md). Then remove the log and
+   `/tmp/dev-up-PORT.state`.

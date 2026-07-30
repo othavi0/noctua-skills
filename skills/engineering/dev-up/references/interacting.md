@@ -28,6 +28,10 @@ After [`SKILL.md`](../SKILL.md) hands control back, this is how to drive and deb
   exception) lives in the **browser console**, which the shell can't observe → **no automatic
   alert**. Run `read_console_messages` (`onlyErrors`) / `read_network_requests` on the tab **when**
   the screen looks broken or an action fails; don't wait for a spontaneous notification.
+- **Scroll, then prove the scroll before the shot.** A screenshot right after a programmatic
+  scroll (`scrollIntoView` via `javascript_tool`) can capture the page back at the top — the
+  scroll and the capture race. Confirm the position first (read `window.scrollY`, or re-`find` the
+  target) before shooting; a real run burned two scroll+screenshot cycles on this.
 - **Storage/cookies.** `javascript_tool` reads `localStorage`/`sessionStorage` and non-HttpOnly
   cookies directly. A **HttpOnly** session cookie is invisible to JS — reading it would need a
   CDP/debug port, which abandons this setup, so it's out of reach here.
