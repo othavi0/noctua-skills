@@ -1,8 +1,8 @@
 ---
 name: humanize-pt-br
 description: >-
-  Remove marcas de IA em textos em português brasileiro. Use ao revisar ou reescrever qualquer
-  prosa em PT-BR. Detecta 30+ padrões: vocabulário inflacionado, conectivos sobreusados,
+  Remove marcas de IA em textos em português brasileiro. Use ao escrever, revisar ou reescrever
+  qualquer prosa em PT-BR. Detecta 30+ padrões: vocabulário inflacionado, conectivos sobreusados,
   frases-gatilho, nominalização, voz passiva impessoal, paralelismo negativo, tripla adjetival,
   travessão em excesso, bajulação, conclusões genéricas. Catálogo da Wikipedia adaptado a PT-BR,
   mais Strunk.
@@ -33,6 +33,8 @@ Enquanto reescreve, sempre:
 - **Injete voz**: limpar não basta; texto sem alma também parece IA
 
 Pedido ambíguo (revisar ou reescrever? registro formal ou casual?): pergunte via AskUserQuestion antes de reescrever.
+
+Escrevendo prosa nova em PT-BR, não só revisando? O catálogo vale igual — e é o uso mais comum na prática: carregue `references/patterns-pt-br.md` antes de escrever e rode o checklist antes de entregar.
 
 ## Quando ler `references/patterns-pt-br.md`
 
