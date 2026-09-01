@@ -1,2 +1,5 @@
 # Estado runtime do harness (não versionar)
 .claude/*.lock
+
+# Artefatos de empacotamento
+*.zip

@@ -263,12 +263,12 @@ If yes, in order:
 3. `fuser -k PORT/tcp` — kills exactly who holds the listening socket (`lsof -ti tcp:PORT | xargs
    kill` would also catch the **browser** attached to the port). If the port keeps coming back,
    an external supervisor is respawning it — tell the user, don't kill blindly.
-4. **Close only `TARGET_TAB_ID`** with `tabs_close_mcp` — never the shared group, never a tab you
+4. **Close only `TARGET_TAB_ID`** with `tabs_close_mcp` — never the group itself, never a tab you
    didn't open. Match by the **recorded id's value** against the live `tabs_context_mcp` list,
    never by which tab looks like yours — a recorded id can be silently reused for another URL (a
    real shutdown closed the wrong tab this way). A "tab group no longer exists" reply is an
    *inconclusive* state to note in the handback, not proof the environment is clean. ⚠️ If yours
    might be the *last* tab in the group, closing it can collapse the whole group; the last-tab
-   hazard and the rest of the shared-group rules are in
+   hazard and the rest of the group rules are in
    [`references/coexistence.md`](references/coexistence.md). Then remove the log and
    `/tmp/dev-up-PORT.state`.
