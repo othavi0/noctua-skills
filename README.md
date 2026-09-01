@@ -56,15 +56,6 @@ four-step engine (detect, draft, self-audit, deliver) and refuses to invent a
 fact the source does not carry. Feed it a sample of your own writing and it
 calibrates the voice against that instead of the defaults.
 
-## Runbooks
-
-[docs/](./docs/README.md) holds operational notes that are **not** agent skills:
-reinstall recipes, desktop workarounds, how do I do this again in six months.
-Right now that is [DaVinci Resolve on
-Omarchy](./docs/omarchy/davinci-resolve.md), covering the AUR manual zip, the
-Intel + NVIDIA hybrid GPU wrapper, the Super+Space `.desktop`, and the lockfile
-and zombie fixes.
-
 ---
 
 Part of the **noctua** toolset, alongside
