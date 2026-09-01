@@ -48,6 +48,11 @@ ss -ltn "sport = :PORT" | grep -q LISTEN && echo BUSY || echo FREE
 
 ### 2. Start the server
 
+0. **Preflight deps in a worktree.** A fresh worktree (`~/.herdr/worktrees/…`, `git worktree`) has
+   no `node_modules`/`.venv`: check before launching (`[ -d node_modules ] || [ -d .venv ]`), and if
+   missing, symlink from the main checkout (`ln -s <main>/node_modules node_modules`, same for
+   `.venv` and per-app `apps/*/node_modules`) or install with the lockfile's manager. Two audited
+   runs burned a launch + log read on `esbuild: command not found` for lack of this step.
 1. **Find the dev command.** Read the manifest. In a **monorepo** (`workspaces`, `turbo.json`,
    `pnpm-workspace.yaml`, `nx.json`) the root `dev` starts *every* app — list the workspaces with
    a `dev` script, ask which if there's more than one, and work in that app's dir.
@@ -108,11 +113,15 @@ One Monitor, persistent, filtering the log for trouble:
 ```bash
 tail -n 0 -f /tmp/dev-up-PORT.log | grep -E --line-buffered \
   "[Ee]rror|Exception|Traceback|[Ww]arn|Failed to compile|unhandled|ECONNREFUSED|EADDRINUSE|panic|FATAL" \
-  | grep -v --line-buffered "NEXT_REDIRECT"
+  | grep -v --line-buffered -E "NEXT_REDIRECT|PoolError|QueuePool limit|Too many connections"
 ```
 
 (`NEXT_REDIRECT` is Next.js's internal redirect signal, not an error — a documented false positive
-that pushed duplicate alerts in a real run, hence the exclusion.)
+that pushed duplicate alerts in a real run, hence the exclusion. `PoolError`/`QueuePool limit` is
+the DB pool saturating under an E2E burst: benign, and it woke the controller 7 times in one
+audited session, each wake a full turn. **Any error you classify as benign at runtime goes into
+this exclusion list on the spot** — re-arm the Monitor with the wider filter instead of answering
+the same alert twice.)
 
 `description: "errors on port PORT"`, **`persistent: true`** — that flag is the whole safety: it
 keeps the watcher alive for the entire session, and with it set the Monitor's `timeout_ms` is
@@ -182,12 +191,15 @@ stabilises instead of spamming.
      (Multiple connected browsers just means multiple devices to choose between — **not** a shared
      group; each session has its own. See [`references/coexistence.md`](references/coexistence.md).)
 2. **Find or create the tab.** `tabs_context_mcp` (`createIfEmpty: true`): reuse an existing tab on
-   `localhost:PORT`, else `tabs_create_mcp`. **Arm the console/network tracking before
-   navigating**: one throwaway `browser_batch` of `read_console_messages` + `read_network_requests`
-   on the tab — both tools only start recording at their first call, so a reading taken after the
-   navigate is structurally empty (10 of 15 audited runs hit this and burned a re-navigate). Then
-   `navigate` to **`http://localhost:PORT` — the
-   root, not a deep route** (try `https://` if it won't load). Root surfaces any login redirect
+   `localhost:PORT`, else `tabs_create_mcp`. **Never call `browser_batch` on a tab still at
+   `about:blank`/`chrome://newtab`** — the MCP refuses browser-internal URLs (`Can't interact with
+   browser-internal or unparseable URLs`; 4 audited sessions hit this). Order: `navigate` to
+   **`http://localhost:PORT` — the root, not a deep route** (try `https://` if it won't load);
+   then **arm the console/network tracking**: one throwaway `browser_batch` of
+   `read_console_messages` + `read_network_requests` on the tab — both tools only start recording
+   at their first call, so a reading taken before arming is structurally empty (10 of 15 audited
+   runs hit this and burned a re-navigate); then `navigate` to the root once more so the boot is
+   recorded. Root surfaces any login redirect
    whatever route the app lands on, so you catch auth before going deeper; navigating straight to a
    protected sub-path on first load can 307 into a Chrome error page that then blocks every
    `claude-in-chrome` call. Once the root's confirmed, navigate on to the route you actually need.
