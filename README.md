@@ -2,7 +2,7 @@
 
 [![skills.sh](https://skills.sh/b/othavi0/noctua-skills)](https://skills.sh/othavi0/noctua-skills)
 
-Three Claude Code skills I use every day, packaged to drop into any project. Each
+Four Claude Code skills I use every day, packaged to drop into any project. Each
 one came out of a real friction, and gets cut the moment it stops earning its
 place.
 
@@ -38,6 +38,19 @@ a fresh git worktree it checks for missing `node_modules` first, because a launc
 that dies on `esbuild: command not found` costs a full turn. Needs the
 [claude-in-chrome](https://docs.claude.com/en/docs/claude-code) browser connection,
 and walks through that one-time setup itself on first run.
+
+**[mobile-up](./skills/engineering/mobile-up/SKILL.md)** exists because an Expo
+app needs three things up at once and each one lies in its own way. The dev
+server, Metro and the Android emulator all report "running" long before the
+phone can use them: the app's env still says `localhost`, the port in LISTEN
+belongs to another worktree, the bundle on air was built with yesterday's URL,
+the emulator is showing someone else's session. One command brings the three up,
+writes the machine's LAN IP into the app's env, waits for each piece to answer,
+opens the app with a fresh bundle and waits for Metro to confirm it delivered
+it. A port held by another checkout sends the skill to the next free one, and a
+process it did not start it never kills. The evidence goes into a question for
+you. Each symptom a device can show maps to one check and one fix. Linux host,
+Android SDK for the emulator. iOS is out of scope.
 
 **[claude-md-prune](./skills/engineering/claude-md-prune/SKILL.md)** exists because
 `CLAUDE.md` bloats into noise. Project memory grows by accretion: paths that moved,
