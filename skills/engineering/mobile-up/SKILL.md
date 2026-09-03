@@ -9,9 +9,11 @@ description: |
 when_to_use: |
   "run the app", "test it on my phone", "open the emulator", "bring everything up", "the app
   can't reach the API", "who is holding port 8081". Not for a web-only dev server on an arbitrary
-  port (that is dev-up), and not for running the test suite.
+  port (that is dev-up), and not for running the test suite. Linux host only; on macOS or Windows
+  follow references/other-platforms.md by hand instead of running the script.
 argument-hint: "[server|app|emulator|status]"
 allowed-tools: Bash(bash ${CLAUDE_SKILL_DIR}/scripts/mobile-up.sh *)
+disable-model-invocation: true
 compatibility: Linux host for the script (bash, ss, ip, curl). Android SDK for the emulator target. macOS and Windows hosts follow references/other-platforms.md by hand.
 ---
 
@@ -20,7 +22,7 @@ compatibility: Linux host for the script (bash, ss, ip, curl). Android SDK for t
 One command brings up the pair an Expo app needs (dev server + Metro), syncs the machine's LAN IP
 into the app's env, proves each piece answers, and hands back the addresses. The deterministic
 part lives in `scripts/mobile-up.sh`; the judgement calls live here. Run the script instead of
-redoing its steps by hand: every step carries a pitfall that already cost a session.
+redoing its steps by hand: several of them have cost a session before (see Red flags below).
 
 ## Targets
 
@@ -31,13 +33,13 @@ redoing its steps by hand: every step carries a pitfall that already cost a sess
 | `emulator` | dev server + Metro + Android AVD, app opened with a fresh bundle | you drive the app yourself and capture the screen |
 | `status` | nothing (read-only) | something should be up and is not; who owns a port; what the bundle was built with |
 
-Metro alone gives an app that opens and loads nothing when the app consumes a local API, so `app`
+When the app consumes a local API, Metro alone opens it on a screen with no data, so `app`
 and `emulator` include the server. A project without a local API sets `SERVER=none` (see
 `references/config.md`).
 
 ## Run it
 
-1. **Run in the background** and read the output file when the task ends:
+1. **Run with the Bash tool's background flag** and read the whole output once the run ends:
 
    ```bash
    bash ${CLAUDE_SKILL_DIR}/scripts/mobile-up.sh app
@@ -71,7 +73,8 @@ and `emulator` include the server. A project without a local API sets `SERVER=no
 
 ## Handback
 
-The servers belong to the user and stay up until they ask; say so. Report, by target:
+The servers belong to the user and stay up until the user asks you to stop them; say so. Report,
+by target:
 
 - `server`: the two URLs (localhost and LAN), the env line, the log path, the state path.
 - `app`: the above plus the `exp://` URL and the QR exactly as printed, and the firewall commands
@@ -97,6 +100,10 @@ the user makes, whatever started it:
    matches clients connected to the port as well (only `-sTCP:LISTEN` narrows it to the listener),
    and `adb emu kill` without `-s` takes down whichever emulator is on the machine.
 
+`kill` and `adb ... emu kill` are outside `allowed-tools` on purpose: they are not part of the
+pre-approved `mobile-up.sh` invocation, so the harness prompts for approval on both, and that
+prompt is the intended gate on killing a process, not a bug to route around.
+
 `status` answers most "is it up?" questions without touching anything.
 
 ## Missing dependency
@@ -119,7 +126,7 @@ Each row is a rationalisation seen in a real session; the right column is the mo
 
 | Thought | Move |
 |---|---|
-| "I'll run it in the foreground with `tail`, it's quick" | Background, then read the output file whole. |
+| "I'll run it in the foreground with `tail`, it's quick" | Background flag, then read the whole output. |
 | "The 403 is what the plan predicted, dispatch the fix" | Run `status` first: a server older than the packages it serves explains most stale behaviour. |
 | "It hung on the QR step, probably" | Read the log the summary names; a guess without a command is not a diagnosis. |
 | "Port 3001 is mine, kill it" | `status` shows the owner's cwd. Foreign cwd: ask. |

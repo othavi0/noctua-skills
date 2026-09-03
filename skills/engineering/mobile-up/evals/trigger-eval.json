@@ -1,0 +1,22 @@
+[
+  {"query": "/mobile-up app", "should_trigger": true},
+  {"query": "can you fire up the expo app on my phone, I want to test the checkout flow with Expo Go", "should_trigger": true},
+  {"query": "the app on my phone just shows a blank white screen after the splash, can you check what's going on", "should_trigger": true},
+  {"query": "open the android emulator and get the app running there, I need a screenshot of the settings screen", "should_trigger": true},
+  {"query": "getting 'incompatible with this version of Expo Go' when I scan the QR code, what's up with that", "should_trigger": true},
+  {"query": "bring everything up for the mobile app please, server and metro both", "should_trigger": true},
+  {"query": "who's holding port 8081 right now? metro won't start", "should_trigger": true},
+  {"query": "the app can't reach the api, every screen is stuck on a spinner, can you look into it", "should_trigger": true},
+  {"query": "status check on the dev server and metro for the RN app before I hand it to QA", "should_trigger": true},
+  {"query": "run the app on the emulator and confirm the login screen actually renders with real data", "should_trigger": true},
+  {"query": "spin up the dev server on port 4000 for the marketing site, nothing mobile involved", "should_trigger": false},
+  {"query": "run the test suite for the mobile app before I open the PR", "should_trigger": false},
+  {"query": "who is holding port 3000 on this box, the next.js dev server won't bind", "should_trigger": false},
+  {"query": "walk me through setting up the Android SDK and an AVD from scratch on a brand new laptop", "should_trigger": false},
+  {"query": "the emulator screenshot from yesterday looks off, can you crop it and tell me the exact pixel dimensions", "should_trigger": false},
+  {"query": "kill whatever's on port 8081, I don't care what it is, just free it up", "should_trigger": false},
+  {"query": "add a network error banner component to the app when the API call fails", "should_trigger": false},
+  {"query": "explain why Expo Go shows 'incompatible SDK version' errors in general, just curious, nothing running right now", "should_trigger": false},
+  {"query": "bring up the api server and the admin dashboard on their usual ports, no phone or emulator needed today", "should_trigger": false},
+  {"query": "write unit tests for the port-detection logic in mobile-up.sh", "should_trigger": false}
+]

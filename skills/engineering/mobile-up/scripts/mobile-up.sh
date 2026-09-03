@@ -15,6 +15,12 @@
 # Linux only (needs ss, ip, /proc). Never kills anything.
 set -uo pipefail
 
+# ----------------------------------------------------------------------------- helpers
+say() { printf '%s\n' "$*"; }
+warn() { WARNINGS="${WARNINGS}  - $*"$'\n'; say "warning: $*"; }
+die() { local code="$1"; shift; say "ERROR: $*"; exit "$code"; }
+have() { command -v "$1" >/dev/null 2>&1; }
+
 # ----------------------------------------------------------------------------- args
 TARGET="app"
 SERVER_PORT_ARG=""
@@ -23,20 +29,14 @@ TAKE_EMULATOR=0
 while [ $# -gt 0 ]; do
   case "$1" in
     server|app|emulator|status) TARGET="$1" ;;
-    --server-port) SERVER_PORT_ARG="${2:-}"; shift ;;
-    --metro-port) METRO_PORT_ARG="${2:-}"; shift ;;
+    --server-port) SERVER_PORT_ARG="${2:-}"; case "$SERVER_PORT_ARG" in ''|*[!0-9]*) die 2 "--server-port needs a number, got '${SERVER_PORT_ARG}'";; esac; shift ;;
+    --metro-port) METRO_PORT_ARG="${2:-}"; case "$METRO_PORT_ARG" in ''|*[!0-9]*) die 2 "--metro-port needs a number, got '${METRO_PORT_ARG}'";; esac; shift ;;
     --take-emulator) TAKE_EMULATOR=1 ;;
     -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
     *) printf 'mobile-up: unknown argument "%s"\n' "$1"; sed -n '5,10p' "$0"; exit 2 ;;
   esac
   shift
 done
-
-# ----------------------------------------------------------------------------- helpers
-say() { printf '%s\n' "$*"; }
-warn() { WARNINGS="${WARNINGS}  - $*"$'\n'; say "warning: $*"; }
-die() { local code="$1"; shift; say "ERROR: $*"; exit "$code"; }
-have() { command -v "$1" >/dev/null 2>&1; }
 
 age_h() { # seconds -> "1h12m" / "43s"
   local s="${1:-0}"
@@ -56,7 +56,7 @@ port_pid() { ss -ltnpH "sport = :$1" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | hea
 pid_cwd() { readlink "/proc/$1/cwd" 2>/dev/null || printf '?'; }
 pid_age() { ps -o etimes= -p "$1" 2>/dev/null | tr -d ' '; }
 pid_start() { ps -o lstart= -p "$1" 2>/dev/null; }
-pid_start_epoch() { date -d "$(pid_start "$1")" +%s 2>/dev/null || printf 0; }
+pid_start_epoch() { local s; s="$(pid_start "$1")"; [ -n "$s" ] || { printf 0; return; }; date -d "$s" +%s 2>/dev/null || printf 0; }
 
 cwd_is_ours() { # cwd -> 0 if under ROOT
   local c; c="$(realpath -m "$1" 2>/dev/null || printf '%s' "$1")"
@@ -123,6 +123,21 @@ find_sdk() { # -> SDK root with platform-tools/adb, from machine.conf, env, ~/An
   done
   have adb && { printf '%s' "$(dirname "$(dirname "$(readlink -f "$(command -v adb)")")")"; return 0; }
   return 1
+}
+
+expo_go_compatible() { # expo_go_version project_sdk_major -> 0 compatible, 1 incompatible, 2 unknown (skip warning)
+  local ver="$1" sdk="$2" vmajor="${1%%.*}" vminor
+  vminor="$(printf '%s' "$ver" | cut -d. -f2)"
+  case "$sdk" in
+    51|52|53) # SDK 51-53 shipped Expo Go as androidClientVersion 2.3X.y, X = sdk - 20
+      [ -z "$vmajor" ] && return 2
+      [ "$vmajor" = 2 ] && [ "$vminor" = "$((sdk - 20))" ] && return 0
+      return 1 ;;
+    *) # SDK 54+: Expo Go's own version tracks the project SDK major directly
+      [ -z "$vmajor" ] && return 2
+      [ "$vmajor" = "$sdk" ] && return 0
+      return 1 ;;
+  esac
 }
 
 find_ours_port() { # base -> port in [base, base+20] whose listener runs under ROOT (our earlier run), or nothing
@@ -248,6 +263,9 @@ fi
 SERVER_TIMEOUT="$(conf_get "$CONF" SERVER_TIMEOUT || printf 90)"
 METRO_TIMEOUT="$(conf_get "$CONF" METRO_TIMEOUT || printf 120)"
 BOOT_TIMEOUT="$(conf_get "$CONF" BOOT_TIMEOUT || printf 360)"
+case "$SERVER_TIMEOUT" in *[!0-9]*|'') warn "SERVER_TIMEOUT '$SERVER_TIMEOUT' in $CONF is not a number; using the default of 90s"; SERVER_TIMEOUT=90 ;; esac
+case "$METRO_TIMEOUT" in *[!0-9]*|'') warn "METRO_TIMEOUT '$METRO_TIMEOUT' in $CONF is not a number; using the default of 120s"; METRO_TIMEOUT=120 ;; esac
+case "$BOOT_TIMEOUT" in *[!0-9]*|'') warn "BOOT_TIMEOUT '$BOOT_TIMEOUT' in $CONF is not a number; using the default of 360s"; BOOT_TIMEOUT=360 ;; esac
 
 # ----------------------------------------------------------------------------- network
 IP="${MOBILE_UP_IP:-}"
@@ -263,6 +281,7 @@ if [ -n "$IP" ] && [ -n "$IP_DEV" ]; then
     warn "default route goes through $IP_DEV (VPN?): $IP may be unreachable from a phone on the Wi-Fi. Override with MOBILE_UP_IP=<lan-ip>." ;;
   esac
 fi
+[ -z "$IP" ] && [ "$TARGET" = "app" ] && warn "no LAN IP (no default route?): the exp:// URL and QR below will be missing the host address"
 
 # ----------------------------------------------------------------------------- state (previous run)
 prev() { conf_get "$STATE" "$1" || true; }
@@ -504,17 +523,19 @@ if [ "$TARGET" = "emulator" ]; then
       else
         EXPO_GO_VER="$(adb_ shell dumpsys package host.exp.exponent 2>/dev/null | grep -m1 versionName | cut -d= -f2 | tr -d '\r ')"
         SDKV="$(grep -oP '"expo"\s*:\s*"[~^]?\K[0-9]+' "$APP_DIR/package.json" | head -1)"
-        if [ -n "$SDKV" ] && [ "${EXPO_GO_VER%%.*}" != "$SDKV" ]; then
-          warn "Expo Go $EXPO_GO_VER on $SERIAL vs project SDK $SDKV: expect 'Project is incompatible with this version of Expo Go'. Fix: npx expo-go download android $SDKV && $ADB -s $SERIAL install -r <apk>"
+        if [ -n "$SDKV" ]; then
+          expo_go_compatible "$EXPO_GO_VER" "$SDKV"
+          [ $? -eq 1 ] && warn "Expo Go $EXPO_GO_VER on $SERIAL vs project SDK $SDKV: expect 'Project is incompatible with this version of Expo Go'. Fix: npx expo-go download android $SDKV && $ADB -s $SERIAL install -r <apk>"
         fi
         # the emulator is one shared device: another session may be driving Expo Go right now
-        DL="exp://${IP:-127.0.0.1}:$METRO_PORT"
+        # 10.0.2.2 is Android's alias for the host machine, immune to VPN/firewall on the LAN IP
+        DL="exp://10.0.2.2:$METRO_PORT"
         CUR_LINE="$(adb_ logcat -d -s ReactNativeJS:I 2>/dev/null | grep -a 'Running "main"' | tail -1)"
         CUR_URI="$(printf '%s' "$CUR_LINE" | grep -oP '"initialUri":"\K[^"]*')"
         CUR_HOST="$(printf '%s' "$CUR_URI" | sed -E 's|^exp://([^/]+).*|\1|')"
         FOCUS="$(adb_ shell dumpsys window 2>/dev/null | grep -m1 mCurrentFocus)"
         BUSY=0
-        if [ "$TAKE_EMULATOR" -eq 0 ] && [ -n "$CUR_HOST" ] && [ "$CUR_HOST" != "${IP}:$METRO_PORT" ] && printf '%s' "$FOCUS" | grep -q 'host.exp.exponent/.*ExperienceActivity'; then
+        if [ "$TAKE_EMULATOR" -eq 0 ] && [ -n "$CUR_HOST" ] && [ "$CUR_HOST" != "10.0.2.2:$METRO_PORT" ] && printf '%s' "$FOCUS" | grep -q 'host.exp.exponent/.*ExperienceActivity'; then
           BUSY=1
           EMU_STATUS="busy"; EMU_NOTE="$EMU_NOTE; Expo Go is showing $CUR_URI (launched $(printf '%s' "$CUR_LINE" | cut -c1-18)), another Metro than ours ($DL). Another session may be driving this emulator: ASK THE USER, then rerun with --take-emulator"; EXIT=6
         fi
@@ -580,7 +601,7 @@ say "logs      $LOG_SERVER"; say "          $LOG_METRO"; [ "$TARGET" = "emulator
 say "state     $STATE"
 if [ "$TARGET" = "app" ]; then
   say ""
-  if have qrencode; then qrencode -t ANSIUTF8 "exp://$IP:$METRO_PORT"; else say "(install qrencode for a QR here, or type exp://$IP:$METRO_PORT in Expo Go)"; fi
+  if have qrencode; then qrencode -t ANSIUTF8 "exp://${IP:-?}:$METRO_PORT"; else say "(install qrencode for a QR here, or type exp://${IP:-?}:$METRO_PORT in Expo Go)"; fi
   if [ -n "$IP_NET" ]; then
     if systemctl is-active ufw >/dev/null 2>&1; then
       say ""; say "ufw is active. If the phone cannot connect, allow this network (needs sudo, ask the user):"

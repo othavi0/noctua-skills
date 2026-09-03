@@ -1,0 +1,22 @@
+[
+  {"query": "Our CLAUDE.md ballooned to like 400 lines and I feel like Claude is just ignoring half of it now, can you clean it up?", "should_trigger": true},
+  {"query": "Can you do a Boris-style pass on CLAUDE.md? I want it down to just the stuff that actually prevents mistakes.", "should_trigger": true},
+  {"query": "audit apps/api/CLAUDE.md for stale references, we renamed a bunch of folders in the last refactor and I bet it's full of dead paths now", "should_trigger": true},
+  {"query": "this CLAUDE.md is a mess, half of it is just repeating what package.json already says. trim it", "should_trigger": true},
+  {"query": "run a documentation audit on the repo, we haven't touched CLAUDE.md or the workspace-level ones in packages/* in a year", "should_trigger": true},
+  {"query": "Claude keeps asking me things that are literally answered in CLAUDE.md, so either it's too long or something's off, can you look?", "should_trigger": true},
+  {"query": "shrink our root CLAUDE.md, it's 600 lines and mostly stack lists and a directory tree nobody updates", "should_trigger": true},
+  {"query": "i want a minimal, mistakes-only claude.md, right now ours reads like a readme", "should_trigger": true},
+  {"query": "check if the commands and env vars listed in CLAUDE.md still match what's actually in package.json and the zod env schema", "should_trigger": true},
+  {"query": "our CLAUDE.md references ADR-0004 for the sync workflow but I think we superseded that months ago, can you check and prune while you're at it", "should_trigger": true},
+  {"query": "add a note to CLAUDE.md that drizzle-kit push needs a TTY, it bit me again today", "should_trigger": false},
+  {"query": "we don't have a CLAUDE.md yet, can you write one for this repo based on the codebase", "should_trigger": false},
+  {"query": "Claude made the same mistake with our cookie domain again, capture that in CLAUDE.md so future sessions catch it", "should_trigger": false},
+  {"query": "our CLAUDE.md is 230 lines but it's basically all incident notes and P0 rules, is that too long?", "should_trigger": false},
+  {"query": "the README is a wall of text nobody reads anymore, can you cut it down", "should_trigger": false},
+  {"query": "AGENTS.md hasn't been touched since the migration off the old auth lib, some of it is probably wrong now", "should_trigger": false},
+  {"query": "there's a typo in CLAUDE.md, 'recieve' should be 'receive', can you fix it", "should_trigger": false},
+  {"query": "our onboarding doc references commands that don't exist anymore, can you update docs/onboarding.md", "should_trigger": false},
+  {"query": "can you set up a hook so Claude always runs bun fix after edits instead of us writing it in CLAUDE.md every time", "should_trigger": false},
+  {"query": "does /doctor already do CLAUDE.md trimming or do I need something else for that", "should_trigger": false}
+]

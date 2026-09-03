@@ -3,3 +3,6 @@
 
 # Artefatos de empacotamento
 *.zip
+
+# Metadata do Finder (macOS)
+.DS_Store

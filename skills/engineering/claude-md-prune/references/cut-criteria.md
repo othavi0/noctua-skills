@@ -1,4 +1,4 @@
-# Cut Criteria — what gets removed
+# Cut criteria
 
 Content categories that Claude can infer from the code or from generic language knowledge. Cut aggressively.
 
@@ -214,10 +214,4 @@ by the API layer. Sessions are stored in the database with a TTL of
 
 ## Summary heuristic
 
-For any candidate line/section, ask:
-
-> **"If I deleted this line, would Claude make a mistake it wouldn't make otherwise?"**
-
-If no → cut.
-If unsure → ask the user "did this line ever fix a real bug?" before cutting.
-If yes → keep (see `keep-criteria.md`).
+Apply the canonical test from SKILL.md Phase 3 to any candidate line/section. If unsure, ask the user "did this line ever fix a real bug?" before cutting. If it survives, see `keep-criteria.md`.

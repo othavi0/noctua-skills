@@ -4,6 +4,7 @@ description: >-
   Humanize prosa em português brasileiro: remove marcas de IA e injeta voz. Use ao escrever,
   revisar, reescrever ou pontuar qualquer texto em PT-BR. Aceita amostra de escrita do autor
   para calibrar a voz do resultado.
+argument-hint: "[arquivo]"
 ---
 
 <!-- Proveniência: blader/humanizer + op7418/Humanizer-zh (fork intermediário) + hardikpandya/stop-slop, adaptados a PT-BR; Wikipedia:Signs of AI writing; Strunk. -->
@@ -73,6 +74,6 @@ O catálogo vale igual ao escrever do zero, e é o uso mais comum na prática: c
 
 Carregue conforme o branch:
 
-- `references/patterns-pt-br.md` (~13k tokens): o catálogo, com 49 marcas em 6 famílias, falsos positivos e sinais de escrita humana. Carregue sempre que for reescrever ou revisar de verdade.
+- `references/patterns-pt-br.md` (8-10k tokens): o catálogo, com 49 marcas em 6 famílias, falsos positivos e sinais de escrita humana. Carregue sempre que for reescrever ou revisar de verdade.
 - `references/voz-e-ritmo.md`: voz, gate de gênero, calibração por amostra, Strunk. Carregue ao injetar voz ou calibrar por amostra.
 - `references/pontuacao.md`: rubrica completa e protocolo do gate. Carregue quando o usuário pedir pontuação.
