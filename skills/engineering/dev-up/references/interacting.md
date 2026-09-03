@@ -19,10 +19,12 @@ After [`SKILL.md`](../SKILL.md) hands control back, this is how to drive and deb
   **not** pass output→input: if the next step needs a ref you only discover now, go the normal way.
   A batch skips the permission prompt only when **every** action in it is read-only — mixing
   `navigate` (state-changing) with reads keeps the token saving but forfeits the free pass.
-- **Responsive/breakpoint testing: not with this tab.** `resize_window` reports success but under a
-  tiling WM the viewport doesn't actually change (measured on Hyprland: asked for 390px, stayed at
-  2106). For mobile/breakpoint checks, use `agent-browser` with a device profile instead of
-  fighting this tab.
+- **Responsive/breakpoint testing.** Try it here first: call `resize_window`
+  (`width`/`height`/`tabId`), then confirm with `javascript_tool` that `window.innerWidth`/
+  `innerHeight` actually changed — a one-line check, cheap to run. It failed silently under a
+  tiling WM in one measurement (asked for 390px, stayed at 2106 on Hyprland), so verify rather than
+  trust the tool's own success return. Only when the resize doesn't stick, switch to `agent-browser`
+  with a device profile instead of fighting this tab.
 - **The server is watched; the client is on demand.** The Monitor notifies you on its own — but
   only from the **server log** (stdout). The **client** side (React, `fetch` 4xx/5xx, a browser
   exception) lives in the **browser console**, which the shell can't observe → **no automatic

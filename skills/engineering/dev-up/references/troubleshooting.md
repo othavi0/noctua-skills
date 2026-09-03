@@ -34,7 +34,7 @@ startup misbehaves.
   off dispatching long-running subagents. If *you* launched it with `run_in_background` (the normal
   path), the harness re-invokes you when that task exits, so the death is signalled for free. When
   you come back from long subagent work, a session restart, or a context compaction, **restore the
-  whole contract, not just the port**: read `/tmp/dev-up-PORT.state` (written at handback) and
+  whole contract, not just the port**: read `~/.cache/dev-up/PORT.state` (written at handback) and
   verify all four pieces — port listening, server task, watcher alive, `TARGET_TAB_ID` still on the
   right URL. In audited sessions the server was relaunched while the watcher stayed dead for a day,
   and a compaction silently swapped the pinned port (5001 → 5000); re-checking only `ss` catches

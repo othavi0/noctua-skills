@@ -1,0 +1,22 @@
+[
+  {"query": "/dev-up 3000", "should_trigger": true},
+  {"query": "Can you start the dev server on port 5173 for me?", "should_trigger": true},
+  {"query": "sobe o servidor de dev na porta 8080 sem derrubar as abas que já estão abertas", "should_trigger": true},
+  {"query": "Open a browser tab pointed at localhost:4000 and watch the logs for errors", "should_trigger": true},
+  {"query": "I need to view the app running on port 3001, other instances are also running dev servers right now", "should_trigger": true},
+  {"query": "serve this project on port 8000 and keep an eye on the log for crashes", "should_trigger": true},
+  {"query": "run the dev server on port 9000, and don't touch the other tabs already open", "should_trigger": true},
+  {"query": "monitor the app on localhost:3000, ping me if it throws an error", "should_trigger": true},
+  {"query": "start up port 5000 for this repo, I've got two other dev-up sessions running elsewhere", "should_trigger": true},
+  {"query": "quero rodar o dev server nessa porta e já deixar uma aba do navegador aberta nele", "should_trigger": true},
+  {"query": "sobe o app Expo no emulador Android, preciso testar no celular", "should_trigger": false},
+  {"query": "run the app on my phone with Expo Go and open it", "should_trigger": false},
+  {"query": "who is holding port 8081", "should_trigger": false},
+  {"query": "deploy this project to production on port 443", "should_trigger": false},
+  {"query": "write a script that starts a Flask server and prints its port to a log file", "should_trigger": false},
+  {"query": "explain how to configure Vite to bind on a custom port", "should_trigger": false},
+  {"query": "run our test suite and tell me which tests fail", "should_trigger": false},
+  {"query": "check if port 3000 is free before I hardcode it in the deploy config", "should_trigger": false},
+  {"query": "resize the browser window to mobile width for a screenshot", "should_trigger": false},
+  {"query": "our staging Postgres on port 5432 keeps refusing connections, can you check the DB config", "should_trigger": false}
+]
