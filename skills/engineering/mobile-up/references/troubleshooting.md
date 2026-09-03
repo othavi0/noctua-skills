@@ -5,8 +5,8 @@ the vague "error on the phone" and the fix for one does nothing for the others. 
 matches, stop and ask the user for the exact text or a photo of the error instead of trying
 fixes in the dark.
 
-Start every diagnosis with `mobile-up.sh status`: it shows who owns each port, the URL in the env,
-and the URL the running Metro was started with.
+Start every diagnosis with `bash ${CLAUDE_SKILL_DIR}/scripts/mobile-up.sh status`: it shows who
+owns each port, the URL in the env, and the URL the running Metro was started with.
 
 ## The app opens, then no screen loads data ("Network request failed", spinners forever)
 
@@ -93,8 +93,8 @@ names the interface.
 
 **Cause**: the default route is a VPN tunnel; its address is not on the Wi-Fi.
 
-**Fix**: `MOBILE_UP_IP=<lan-ip> bash mobile-up.sh <target>`. The LAN IP is on
-`ip -4 -o addr show` for the Wi-Fi interface.
+**Fix**: `MOBILE_UP_IP=<lan-ip> bash ${CLAUDE_SKILL_DIR}/scripts/mobile-up.sh <target>`. The LAN IP
+is on `ip -4 -o addr show` for the Wi-Fi interface.
 
 ## API answers 401/403 or old shapes after a change in a workspace package
 
