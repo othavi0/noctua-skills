@@ -1,4 +1,4 @@
-# Drift Checks — verifying CLAUDE.md against current code
+# Drift checks
 
 The drift detection phase is often more valuable than the cutting phase: silent drift (doc says X, code says Y) leads Claude to apply rules that don't exist anymore. This file lists the universal checks; parallelize them across the doc.
 

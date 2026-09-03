@@ -1,6 +1,6 @@
-# Keep Criteria — what survives the filter
+# Keep criteria
 
-Content that **would cause Claude to make mistakes if removed**. These are the survivors after applying the Boris/Anthropic filter.
+Content that survives the canonical test in SKILL.md Phase 3 ("Would Claude make mistakes if I removed this line?"). These are the survivors after applying the Boris/Anthropic filter.
 
 When the user pushes back on cutting something, it's usually because it falls into one of these categories — make sure to recognize them.
 
@@ -23,7 +23,7 @@ A concrete bug or quirky behavior of the framework/library, plus what to do abou
 
 **Looks like:**
 
-- "Drizzle-kit push pides TTY confirmation in destructive changes — fails in scripted CI. In dev, run interactive."
+- "Drizzle-kit push requires TTY confirmation in destructive changes — fails in scripted CI. In dev, run interactive."
 - "`React.forwardRef` is deprecated in React 19 — use `ref` as a normal prop."
 - "Next.js `experimental.serverActions.bodySizeLimit` defaults to 1MB; uploads via base64 inline need it raised."
 - "Drizzle 0.45.x `db.execute()` returns timestamp as string (driver bypass) — coerce with `toDate()` at boundary."
@@ -82,20 +82,14 @@ Rules that don't belong to a single workspace or directory — they apply projec
 
 ## How to spot a survivor
 
-For each candidate, ask three questions:
+For each candidate, ask two questions, then apply the canonical test from SKILL.md Phase 3:
 
 1. **Is this guessable from reading the code?** If yes → cut.
 2. **Is this a language/framework default Claude already knows?** If yes → cut.
-3. **Did this ever fix a real bug, or does it encode a non-obvious decision?** If yes → KEEP.
+3. Otherwise, apply the canonical test. If it did fix a real bug, or encodes a non-obvious decision → KEEP.
 
-When in doubt about question 3, ask the user — they remember the history.
+When in doubt on the canonical test, ask the user — they remember the history.
 
-## Survival rate guideline
+## How much survives
 
-For a CLAUDE.md that has never been pruned:
-
-- A file > 300 lines typically loses **70-80%** of its content in a first prune
-- A file 100-200 lines typically loses **30-50%**
-- A file < 100 lines that was already lean typically loses **5-20%** (mostly stale references caught by drift detection)
-
-These are observed averages across audits — actual results depend on how much the doc was originally written as documentation vs. as a mistakes log.
+There is no fixed percentage to aim for. How much a CLAUDE.md loses in a first prune depends entirely on how much of it was written as documentation (stack lists, architecture explainers, tutorials — almost all of that cuts) versus written as a mistakes log (gotchas, P0 invariants, incident notes — almost all of that stays). The result of an audit is the sum of what got classified CUT in Phase 3, never a target to hit.
