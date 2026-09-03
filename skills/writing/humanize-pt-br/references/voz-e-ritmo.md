@@ -15,11 +15,11 @@ Voz é a presença perceptível de uma pessoa no texto: opinião, escolha, arest
 
 **Como adicionar voz:**
 
-- **Tenha opinião.** Não só relate fatos: reaja a eles. "Honestamente, não sei o que pensar disso" é mais humano do que listar prós e contras.
+- **Tenha opinião.** Reaja aos fatos, além de relatá-los. "Honestamente, não sei o que pensar disso" é mais humano do que listar prós e contras.
 - **Admita complexidade.** "Isso impressiona mas também incomoda" > "Isso impressiona".
-- **Use "eu" quando couber.** Primeira pessoa não é falta de profissionalismo, é honestidade.
-- **Permita alguma bagunça.** Estrutura perfeita parece algoritmo. Divagação, parêntese, ideia inacabada são marcas humanas.
-- **Seja específico nos sentimentos.** Não "isso é preocupante", e sim "às três da manhã, com ninguém olhando, o agente continua rodando: isso incomoda".
+- **Use "eu" quando couber.** Primeira pessoa é honestidade.
+- **Permita alguma bagunça.** Estrutura perfeita parece algoritmo. Divagação, ideia inacabada, frase que muda de rumo no meio são marcas humanas (sem parênteses nem travessão: regra 38).
+- **Seja específico nos sentimentos.** Troque "isso é preocupante" por "às três da manhã, com ninguém olhando, o agente continua rodando: isso incomoda".
 
 **Antes (limpo mas sem voz):**
 > O experimento gerou resultados interessantes. O agente produziu 3 milhões de linhas de código. Alguns desenvolvedores ficaram impressionados, outros céticos. As implicações ainda não estão claras.

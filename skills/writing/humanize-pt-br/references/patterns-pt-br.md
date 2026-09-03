@@ -1,6 +1,6 @@
 # Marcas de IA em português brasileiro: catálogo de detecção
 
-Catálogo das marcas linguísticas que delatam texto gerado por LLM em PT-BR, com exemplos antes/depois. Carregue este arquivo quando for editar prosa em PT-BR: ele consome ~13k tokens.
+Catálogo das marcas linguísticas que delatam texto gerado por LLM em PT-BR, com exemplos antes/depois. Carregue este arquivo quando for editar prosa em PT-BR. Ele consome 8-10k tokens.
 
 Fontes: [blader/humanizer](https://github.com/blader/humanizer) (via fork [op7418/Humanizer-zh](https://github.com/op7418/Humanizer-zh)), [hardikpandya/stop-slop](https://github.com/hardikpandya/stop-slop), [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing), adaptados a PT-BR e enriquecidos com fontes brasileiras (lista completa no fim).
 
@@ -121,7 +121,7 @@ Fontes: [blader/humanizer](https://github.com/blader/humanizer) (via fork [op741
 
 ### 4. Vocabulário etéreo corporativo
 
-**Lista:** "ecossistema", "paradigma", "jornada", "universo", "panorama", "cenário", "essência", "DNA da marca", "framework", "narrativa", "verticalização", "disrupção".
+**Lista:** "ecossistema", "paradigma", "jornada", "universo", "cenário", "essência", "DNA da marca", "framework", "narrativa", "verticalização", "disrupção".
 
 **Problema:** Soam importantes, mas são semanticamente vagos. Quando aparecem em texto técnico ou jornalístico, quase sempre são IA ou marketing genérico.
 
@@ -200,7 +200,7 @@ Fontes: [blader/humanizer](https://github.com/blader/humanizer) (via fork [op741
 
 **Lista:** realmente, literalmente, genuinamente, honestamente, simplesmente, absolutamente, extremamente, incrivelmente, profundamente, verdadeiramente, fundamentalmente, essencialmente, basicamente, efetivamente.
 
-**Problema:** A IA usa advérbios de intensidade como enchimento: a frase perde nada quando eles saem, e é isso que os denuncia. Não é uma proibição absoluta: advérbio que muda o sentido fica ("aumentou gradualmente"); advérbio que só infla, cai.
+**Problema:** A IA usa advérbios de intensidade como enchimento: a frase não perde nada quando eles saem, e é isso que os denuncia. Não é uma proibição absoluta: advérbio que muda o sentido fica ("aumentou gradualmente"); advérbio que só infla, cai.
 
 **Antes:**
 > O resultado foi realmente impressionante e mostra que a equipe está genuinamente comprometida em entregar algo verdadeiramente diferente.
@@ -356,7 +356,7 @@ Fontes: [blader/humanizer](https://github.com/blader/humanizer) (via fork [op741
 
 ### 17. Contrastes binários e paralelismo negativo
 
-**Padrão:** negar X para afirmar Y — a família inteira, não só "não apenas… mas também":
+**Padrão:** negar X para afirmar Y: a família inteira, não só "não apenas… mas também":
 
 | Variante | Exemplo |
 |---|---|
@@ -387,7 +387,7 @@ Fontes: [blader/humanizer](https://github.com/blader/humanizer) (via fork [op741
 
 **Padrão:** "Não é um manual. Não é um curso. É um mapa."
 
-**Problema:** Variante em série do contraste binário — três negações para revelar uma afirmação que caberia sozinha na primeira frase.
+**Problema:** Variante em série do contraste binário, três negações para revelar uma afirmação que caberia sozinha na primeira frase.
 
 **Antes:**
 > Isto não é um framework. Não é uma metodologia. Não é mais uma buzzword. É um jeito de trabalhar.
@@ -413,7 +413,7 @@ Fontes: [blader/humanizer](https://github.com/blader/humanizer) (via fork [op741
 
 ### 20. Falsa amplitude ("de X a Y")
 
-**Padrão:** "desde X até Y", "de X a Y" — onde X e Y não estão numa escala real.
+**Padrão:** "desde X até Y", "de X a Y", onde X e Y não estão numa escala real.
 
 **Antes:**
 > Nossa plataforma cobre desde startups iniciantes até multinacionais consolidadas, da inteligência artificial às soluções tradicionais.
@@ -463,7 +463,7 @@ Fontes: [blader/humanizer](https://github.com/blader/humanizer) (via fork [op741
 > Lançamos em março. Sem atraso. Sem desculpa. Sem drama. Só entrega.
 
 **Depois:**
-> Lançamos em março, dentro do prazo — a primeira vez em quatro releases. O que mudou foi o corte de escopo feito em janeiro.
+> Lançamos em março, dentro do prazo, pela primeira vez em quatro releases. O que mudou foi o corte de escopo feito em janeiro.
 
 ---
 
@@ -477,7 +477,7 @@ Fontes: [blader/humanizer](https://github.com/blader/humanizer) (via fork [op741
 > No fim, não contratamos currículos. Contratamos histórias.
 
 **Depois:**
-> Nos últimos dois processos, os aprovados não tinham a stack da vaga — tinham projetos próprios que mostravam como aprendem.
+> Nos últimos dois processos, os aprovados não tinham a stack da vaga. Tinham projetos próprios que mostravam como aprendem.
 
 ---
 
@@ -487,7 +487,7 @@ Fontes: [blader/humanizer](https://github.com/blader/humanizer) (via fork [op741
 
 **Lista:** "E se eu te dissesse que…?", "Pense comigo:", "O que isso significa? Significa que…", "Quer saber o que aprendi?", "E é aí que entra o X", parágrafo começando com "Então,".
 
-**Problema:** O leitor não perguntou; a pergunta é palco. Afirme direto. Pergunta genuína dirigida ao leitor (num texto interativo, num formulário) é legítima — a marca é a pergunta-palco autorespondida.
+**Problema:** O leitor não perguntou; a pergunta é palco. Afirme direto. Pergunta genuína dirigida ao leitor (num texto interativo, num formulário) é legítima: a marca é a pergunta-palco autorespondida.
 
 **Antes:**
 > O que isso significa para o seu negócio? Significa que a margem vai cair. E se houvesse uma forma de evitar isso?
@@ -537,7 +537,7 @@ Fontes: [blader/humanizer](https://github.com/blader/humanizer) (via fork [op741
 > As pessoas tendem a adiar decisões difíceis quando não há um prazo claro, e as organizações raramente criam esses prazos.
 
 **Depois:**
-> Sem prazo, você adia a decisão — todo mundo adia. Marque a data da escolha na mesma reunião em que o problema aparecer.
+> Sem prazo, você adia a decisão, e todo mundo adia. Marque a data da escolha na mesma reunião em que o problema aparecer.
 
 ---
 
@@ -585,7 +585,7 @@ Fontes: [blader/humanizer](https://github.com/blader/humanizer) (via fork [op741
 
 ### 32. Atribuição vaga
 
-**Padrão:** "especialistas afirmam", "analistas indicam", "estudos apontam", "observadores apontam", "alguns críticos argumentam", "relatórios da indústria mostram" — sem citar fonte específica.
+**Padrão:** "especialistas afirmam", "analistas indicam", "estudos apontam", "observadores apontam", "alguns críticos argumentam", "relatórios da indústria mostram", sem citar fonte específica.
 
 **Antes:**
 > Estudos apontam que a IA terá um papel crucial nos próximos anos. Especialistas concordam que essa é uma transformação sem precedentes.
@@ -670,11 +670,11 @@ Fontes: [blader/humanizer](https://github.com/blader/humanizer) (via fork [op741
 
 ### 38. Travessão (regra dura)
 
-**Regra:** a entrega final tem **zero** travessões (— e –). Substitutos: vírgula, ponto, dois-pontos ou parênteses. Antes de considerar o texto pronto, faça uma varredura literal procurando `—` e `–`.
+**Regra:** a entrega final tem **zero** travessões (— e –). Substitutos: vírgula, ponto ou dois-pontos. Parênteses não: trocam uma marca de IA por outra, e a skill `unslop` os proíbe pelo mesmo motivo. Antes de considerar o texto pronto, faça uma varredura literal procurando `—` e `–`.
 
-**Por quê:** o travessão é a marca visual mais reconhecida de texto de IA em 2026: a frequência gerada é muitas vezes a humana. Regra de detecção e regra de produção são diferentes: um travessão num texto alheio não prova nada (ver falsos positivos), mas na SUA entrega a política é zero.
+**Por quê:** o travessão é a marca visual mais reconhecida de texto de IA em 2026. Um LLM usa travessão numa frequência muito acima da humana. Regra de detecção e regra de produção são diferentes: um travessão num texto alheio não prova nada (ver falsos positivos), mas na SUA entrega a política é zero.
 
-**Exceção única:** o autor forneceu amostra de escrita que usa travessão — a calibração de voz sobrepõe esta regra.
+**Exceção única:** o autor forneceu amostra de escrita que usa travessão, a calibração de voz sobrepõe esta regra. A calibração por amostra desta skill tem precedência sobre a regra de travessão do `unslop`: quando o autor forneceu amostra com travessão, siga a amostra, não a proibição sem exceção do `unslop`.
 
 **Antes:**
 > Este termo é promovido pelas instituições — não pelo povo. O erro continua — mesmo em documentos oficiais.
@@ -856,14 +856,14 @@ A regra-guia: procure **clusters** de marcas, não marcas isoladas. Uma ocorrên
 
 ## Sinais de escrita humana (preservar)
 
-Ao reescrever, estes traços são valor, não defeito — mantenha:
+Ao reescrever, estes traços são valor, não defeito: mantenha.
 
 - Detalhe específico difícil de fabricar (o nome do bar, o valor exato da multa, o horário do commit).
 - Sentimentos mistos e tensão não resolvida ("impressiona e incomoda ao mesmo tempo").
 - Referências datadas ou geracionais espontâneas.
 - Escolhas editoriais de primeira pessoa que o autor saberia justificar.
 - Variedade genuína de comprimento de frase, incluindo alguma frase torta.
-- Parênteses e autocorreções no meio do caminho ("aliás, corrijo: foram três").
+- Autocorreções no meio do caminho ("aliás, corrijo: foram três"), escritas com vírgula ou ponto. Parêntese não entra na entrega, mesmo como sinal humano: regra 38.
 - Contexto temporal: texto anterior a 30/nov/2022 (lançamento do ChatGPT) quase nunca é gerado por IA.
 
 ---
@@ -892,10 +892,10 @@ Ao reescrever, estes traços são valor, não defeito — mantenha:
 - [blader/humanizer](https://github.com/blader/humanizer) e [op7418/Humanizer-zh](https://github.com/op7418/Humanizer-zh) (fork intermediário de onde esta skill derivou)
 - [hardikpandya/stop-slop](https://github.com/hardikpandya/stop-slop)
 - [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing)
-- Strunk — *The Elements of Style* ([gutenberg.org/ebooks/37134](https://www.gutenberg.org/ebooks/37134))
-- Gazeta do Povo — Clichês de IA em textos de políticos brasileiros
-- Envox — Os maiores vícios de linguagem de IA em 2026
-- Hastewire — Como identificar texto de IA em português
-- Advoco Brasil — 7 sinais que entregam texto gerado por IA
-- Humanizar Textos — Lista de palavras e frases mais comuns do ChatGPT
-- Norma Culta — Lista de pleonasmos mais comuns
+- Strunk: *The Elements of Style* ([gutenberg.org/ebooks/37134](https://www.gutenberg.org/ebooks/37134))
+- Gazeta do Povo: Clichês de IA em textos de políticos brasileiros
+- Envox: Os maiores vícios de linguagem de IA em 2026
+- Hastewire: Como identificar texto de IA em português
+- Advoco Brasil: 7 sinais que entregam texto gerado por IA
+- Humanizar Textos: Lista de palavras e frases mais comuns do ChatGPT
+- Norma Culta: Lista de pleonasmos mais comuns

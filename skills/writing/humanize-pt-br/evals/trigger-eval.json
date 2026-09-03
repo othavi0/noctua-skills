@@ -1,0 +1,22 @@
+[
+  {"query": "revisa esse texto em português e tira as marcas de IA, por favor: 'É importante ressaltar que o projeto representa um marco fundamental para a empresa.'", "should_trigger": true},
+  {"query": "humaniza esse post pra mim, ta com cara de chatgpt, cheio de travessao e essas palavra tipo 'robusto' e 'inovador'", "should_trigger": true},
+  {"query": "reescreve esse parágrafo em pt-br removendo travessão e deixando mais direto, sem perder a informação", "should_trigger": true},
+  {"query": "preciso que você dê uma polida nessa mensagem de commit em português antes de eu mandar pro time, ela tá formal demais", "should_trigger": true},
+  {"query": "roda o humanize no arquivo docs/anuncio.md, os beta testers falaram que parece texto de robô", "should_trigger": true},
+  {"query": "aqui vai um trecho que eu escrevi ano passado pro blog da empresa, usa esse estilo pra calibrar antes de reescrever o rascunho novo", "should_trigger": true},
+  {"query": "só sinaliza as marcas de IA nesse trecho abaixo, não reescreve ainda, quero ver o que pegou família por família", "should_trigger": true},
+  {"query": "esse relatório trimestral em português ficou com aquela cara de texto gerado por IA, dá uma limpada na prosa sem mexer nos números da tabela", "should_trigger": true},
+  {"query": "injeta um pouco de voz nesse texto, tá seco demais, parece verbete de enciclopédia e o gênero aqui é newsletter pessoal", "should_trigger": true},
+  {"query": "meu chefe disse que meu email em português parece ChatGPT, dá uma olhada na pontuação e no ritmo antes de eu enviar", "should_trigger": true},
+  {"query": "corrige os tells de IA nesse texto em inglês antes de mandar pro cliente americano, tá cheio de 'furthermore' e 'it's important to note'", "should_trigger": false},
+  {"query": "aplica o unslop nesse README antes de eu commitar, é sempre pra rodar em qualquer texto que eu gero", "should_trigger": false},
+  {"query": "traduz esse artigo do inglês pro português, é sobre a nova política de privacidade", "should_trigger": false},
+  {"query": "corrige a ortografia e os erros de crase desse texto em português, não precisa mexer no estilo nem no tom", "should_trigger": false},
+  {"query": "revisa esse PR em português, só olha se a lógica do código bate com o que a issue pediu, não precisa mexer na descrição", "should_trigger": false},
+  {"query": "conserta a formatação markdown desse arquivo, os headers tão bagunçados e a tabela quebrou", "should_trigger": false},
+  {"query": "esse texto em espanhol parece gerado por IA, dá uma olhada pra ver se dá pra confirmar", "should_trigger": false},
+  {"query": "revisa a pontuação desse contrato jurídico em inglês, vírgula e ponto-e-vírgula, sem mudar o conteúdo", "should_trigger": false},
+  {"query": "resume esse texto longo em português em 3 bullets, quero só os pontos principais pra reunião", "should_trigger": false},
+  {"query": "gera legendas em português pro vídeo de treinamento a partir do áudio", "should_trigger": false}
+]
