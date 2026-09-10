@@ -43,7 +43,25 @@ offer the update for a freshly released SDK.
 **Fix**: `npx expo-go download android <sdk>` (or https://expo.dev/go), then install: emulator
 `adb -s <serial> install -r <apk>`; physical phone: sideload the APK (serving it from the dev
 server's public directory over the LAN works; delete it afterwards). The durable exit is a
-development build (EAS Build), which does not depend on Expo Go.
+development build (`expo-dev-client`), which does not depend on Expo Go; the script switches to it
+on its own once the app depends on `expo-dev-client`.
+
+## Exit 6: "dev client … is not installed" or "is not a development build"
+
+**Check**: the `emulator:` line names the package. `adb -s <serial> shell pm path <package>` prints
+nothing when it is missing; `adb -s <serial> shell dumpsys package <package> | grep pkgFlags`
+without `DEBUGGABLE` means a release or preview APK sits under the development build's package.
+
+**Cause**: an app with native modules runs only in its own build. A release or preview APK of the
+same package opens the bundle it carries, renders a real screen, and never asks Metro: a smoke on
+it shows old code while every line of the log looks fine.
+
+**Fix**: install a development build (user's call: a local build takes several minutes).
+`npx expo run:android` in the app directory builds and installs it; an EAS `development` APK goes
+in with `adb -s <serial> install -r <apk>`. `INSTALL_FAILED_UPDATE_INCOMPATIBLE` means another
+signing key: `adb -s <serial> uninstall <package>` first, which wipes the app's data (login
+included) on that device, so ask before it. Keep the APK that was there if someone else needs it
+back.
 
 ## Crash right after "Bundled": Expo Go returns to its home screen
 
@@ -84,7 +102,8 @@ right after the `am start`, and the Metro log has no new `Bundled` line.
 
 **Cause**: `am start` without the package, or the `force-stop` glued to the `am start`.
 
-**Fix**: the recipe in `android.md` (package `host.exp.exponent`, `sleep 3` between the two).
+**Fix**: the recipe in `android.md` (package `host.exp.exponent`, or the dev client's own package,
+and `sleep 3` between the two).
 
 ## The phone on the LAN cannot reach an IP the summary shows, and the firewall is off
 

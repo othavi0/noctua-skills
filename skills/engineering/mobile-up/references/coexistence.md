@@ -27,7 +27,7 @@ put in the question:
 |---|---|
 | bundle is stale | pid, the URL Metro was started with, the URL the env has now |
 | started before HEAD | pid, start time, the HEAD commit line, what looks stale |
-| busy emulator | the `initialUri` line: which Metro, launched when |
+| busy emulator | which Metro the app came from (Expo Go: the `initialUri` line, launched when; dev client: the `url=` of the task's launch intent) |
 
 Commands that take out more than intended: `lsof -ti:PORT` and `lsof -ti tcp:PORT` (both match
 clients connected to the port; `-sTCP:LISTEN` keeps only the listener), `pkill -f <pattern>`
@@ -35,10 +35,19 @@ clients connected to the port; `-sTCP:LISTEN` keeps only the listener), `pkill -
 
 ## The emulator is one device
 
-Before opening the app, the `emulator` target reads which Metro the app on screen came from (the
-last `Running "main"` line in logcat). Another port there, with the app in the foreground, means
-another session is driving the emulator: the script reports `busy` and exits 6 without touching
-it. Ask the user; on yes, rerun with `--take-emulator`.
+Before opening the app, the `emulator` target reads which Metro the app in the foreground came
+from, whatever client this project uses: a clock-in run must see a barembar dev client on screen,
+and the other way round. Expo Go in the foreground: the last `Running "main"` line in logcat. Any
+other app: the `url=` of a dev client link in the launch intent of its task (`dumpsys activity
+activities`), since a dev client logs that line without an `initialUri`; `localhost` there (through
+`adb reverse`) counts as the host machine, the same as `10.0.2.2`. Another port means another
+session is driving the emulator: the script reports `busy` and exits 6 without touching it. Ask
+the user; on yes, rerun with `--take-emulator`. An app opened from the launcher carries no URL, and
+the check lets it through.
+
+Projects that live on different AVDs set `AVD` in their own `.claude/mobile-up.conf`: the script
+then picks the emulator booted from that AVD even when another one is running, instead of the
+first `emulator-N` that `adb devices` lists.
 
 A second session that only needs Metro for a side effect (Expo Router generates its route types
 when the dev server starts) starts its own on a spare port and stops that one itself, or skips

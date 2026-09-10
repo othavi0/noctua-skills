@@ -48,9 +48,10 @@ belongs to another worktree, the bundle on air was built with yesterday's URL,
 the emulator is showing someone else's session. One command brings the three up,
 writes the machine's LAN IP into the app's env, waits for each piece to answer,
 opens the app with a fresh bundle and waits for Metro to confirm delivery when
-it can read Metro's log. A port held by another checkout sends the skill to the
+it can read Metro's log. The app opens in Expo Go, or in the project's
+development build when the app depends on `expo-dev-client`. A port held by another checkout sends the skill to the
 next free one, and it never kills a process it did not start. The evidence goes
-into a question for you. Nine symptoms a device can show map to one check and
+into a question for you. Ten symptoms a device can show map to one check and
 one fix each. When none matches, the skill stops and asks you for the error
 text. Linux host, Android SDK for the emulator. iOS is out of scope.
 
