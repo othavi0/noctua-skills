@@ -5,6 +5,13 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `mobile-up` ganhou suporte a dev client. Com `expo-dev-client` no app, os
+  alvos `emulator`, `app` e `status` usam o development build no lugar do Expo
+  Go: deep link `exp+<slug>`, guarda de emulador ocupado que lê o cliente em
+  primeiro plano (Expo Go ou dev client) e falha rápida quando o APK instalado
+  é release ou preview. Chaves novas no conf do projeto: `CLIENT`,
+  `ANDROID_PACKAGE`, `EXPO_SLUG` e `AVD` (issue #3).
+
 - README, seis correções de prosa. Abertura genérica, fórmula repetida "exists
   because", frase de sujeito duplo, tricolon do convite a fork, promessa sem
   ressalva sobre o Metro em `mobile-up`, cobertura de sintomas desatualizada em

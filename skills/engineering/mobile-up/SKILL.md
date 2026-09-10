@@ -2,10 +2,10 @@
 name: mobile-up
 description: |
   Use when invoking `/mobile-up [server|app|emulator|status]`, or when asked to run, start, open,
-  serve or test an Expo app: on a phone with Expo Go, on an Android emulator, or just its dev
-  server. Also use when the app on a device shows a network error, a blank screen, a bundle that
-  never loads, "incompatible with this version of Expo Go", or when a server that should be up
-  is not answering.
+  serve or test an Expo app: on a phone with Expo Go or the project's dev client (development
+  build), on an Android emulator, or just its dev server. Also use when the app on a device shows
+  a network error, a blank screen, a bundle that never loads, "incompatible with this version of
+  Expo Go", or when a server that should be up is not answering.
 when_to_use: |
   "run the app", "test it on my phone", "open the emulator", "bring everything up", "the app
   can't reach the API", "who is holding port 8081". Not for a web-only dev server on an arbitrary
@@ -29,13 +29,28 @@ redoing its steps by hand: several of them have cost a session before (see Red f
 | Target | Brings up | Reach for it when |
 |---|---|---|
 | `server` | dev server | web-only or API-only work |
-| `app` (default) | dev server + Metro, QR on screen | the user tests on a phone with Expo Go |
+| `app` (default) | dev server + Metro, QR on screen | the user tests on a phone (Expo Go or the dev client) |
 | `emulator` | dev server + Metro + Android AVD, app opened with a fresh bundle | you drive the app yourself and capture the screen |
 | `status` | nothing (read-only) | something should be up and is not; who owns a port; what the bundle was built with |
 
 When the app consumes a local API, Metro alone opens it on a screen with no data, so `app`
 and `emulator` include the server. A project without a local API sets `SERVER=none` (see
 `references/config.md`).
+
+## Expo Go or dev client
+
+An app that depends on `expo-dev-client` does not run in Expo Go (native modules Expo Go lacks),
+so the script switches to the project's development build: package and slug from `app.json`,
+deep link `exp+<slug>://expo-development-client/?url=…` instead of `exp://`, and the summary names
+`dev client <package> <version>` instead of `Expo Go <version>`. Ports, env and fresh bundle work
+the same, and the busy-emulator check reads whichever client is in the foreground, Expo Go or a dev
+client. `status` prints which client the project uses. `CLIENT=go|dev` in the project config
+overrides the detection.
+
+The script never builds the dev client: a local build takes several minutes and is the user's
+call. When the package is missing, or the installed APK is a release or preview build of the same
+package (it runs its embedded bundle and ignores Metro), the `emulator` target stops with exit 6
+and names the way to install a development build.
 
 ## Run it
 
@@ -77,14 +92,15 @@ The servers belong to the user and stay up until the user asks you to stop them;
 by target:
 
 - `server`: the two URLs (localhost and LAN), the env line, the log path, the state path.
-- `app`: the above plus the `exp://` URL and the QR exactly as printed, and the firewall commands
-  if the script printed them (they need sudo: the user runs them).
+- `app`: the above plus the app URL (`exp://`, or the dev client link) and the QR exactly as
+  printed, and the firewall commands if the script printed them (they need sudo: the user runs
+  them). With a dev client, say that the phone needs the development build installed, not Expo Go.
 - `emulator`: the above plus the serial, the `adb` path, the `bundle delivered after Ns` line, and
   one screenshot you have read (`references/android.md`). A summary line is not proof that the
   screen shows the app.
 
 Ports can move: when the base port belongs to another checkout, the script picks the next free one
-and the `exp://` URL and the env move with it. Read them from the summary, never from memory.
+and the app URL and the env move with it. Read them from the summary, never from memory.
 
 ## Ownership
 
@@ -114,11 +130,14 @@ installing. Install commands differ per platform, so the user picks the way in. 
 
 - Expo Go on a device or emulator: `npx expo-go download android <sdk>` (the script prints the
   line with the project's SDK), or https://expo.dev/go.
+- Dev client: `npx expo run:android` in the app directory (local build, several minutes), or a
+  `development` profile APK from EAS Build installed with `adb install -r`. Replacing an APK
+  signed with another key needs `adb uninstall` first, which wipes the app's data on that device.
 - Android SDK, `adb`, emulator: Android Studio or the command-line tools at
   https://developer.android.com/studio; the script finds them via `ANDROID_HOME`,
   `ANDROID_SDK_ROOT`, `~/Android/Sdk`, or `adb` on PATH.
 - `qrencode`: the platform's package named `qrencode`; without it the script prints the URL to
-  type into Expo Go.
+  type into Expo Go, or the Metro address to enter in the dev client.
 
 ## Red flags
 
@@ -132,6 +151,7 @@ Each row is a rationalisation seen in a real session; the right column is the mo
 | "Port 3001 is mine, kill it" | `status` shows the owner's cwd. Foreign cwd: ask. |
 | "The screenshot is there, moving on" | Read it. An unread capture proves nothing. |
 | "Same coordinates as before, tap" | Capture, read, then tap (`references/android.md`). |
+| "The app rendered, so it runs our Metro's code" | Only a new `Bundled` line in our Metro log proves it: a preview APK of the same package renders its embedded bundle. |
 
 ## Deeper
 

@@ -14,13 +14,15 @@ dependencies, `node_modules` symlinks to the main checkout.
 | Dev server directory | a `package.json` with a `dev` script that is not the app and not a workspace root; ties broken by a known server dependency (`next`, `hono`, `express`, `fastify`, `@nestjs/core`, `koa`); still ambiguous → config |
 | Dev server port | `--port N`, `-p N` or `PORT=N` in the server's `dev` script; else 3000 for Next, 5173 for Vite; else config |
 | Metro port | `--port N` in the app's `dev` script, else 8081 |
+| Client | `expo-dev-client` in the app's `package.json` → dev client; else Expo Go |
+| Dev client package and slug | `expo.android.package` and `expo.slug` in the app's `app.json` (read with `node`); `app.config.*` is not evaluated, so a project without them in `app.json`, or whose `app.config.*` changes them (a `.dev` package variant, say), sets them in config. `app` needs the slug; `emulator` needs both |
 | URL variable | the single `EXPO_PUBLIC_*URL` name in the app's `.env` (then `.env.example`); several → config |
 | LAN IP | `ip -4 route get 1.1.1.1` (`src` and `dev`); a tunnel-looking interface raises a warning |
 | Network range | `ip -o -4 route show dev <iface> scope link`, so the firewall hint uses the real prefix |
 | Android SDK | `~/.config/mobile-up/machine.conf`, `ANDROID_HOME`, `ANDROID_SDK_ROOT`, `~/Android/Sdk`, `adb` on PATH |
 | AVD home | machine config, then the first of `ANDROID_AVD_HOME`, `$ANDROID_USER_HOME/avd`, `~/.android/avd`, `~/.config/.android/avd` holding a `.ini` |
-| AVD | machine config; else the only one listed; several → config |
-| Emulator serial | `adb devices`, the first `emulator-N` in state `device`; every call then uses `-s` |
+| AVD | project config; else machine config; else the only one listed; several → config |
+| Emulator serial | with `AVD` in the project config, the running emulator booted from that AVD (`adb emu avd name`), else it boots that AVD; without it, the first `emulator-N` in state `device`. Every call then uses `-s` |
 
 ## Preflight
 
@@ -46,6 +48,9 @@ dependencies, `node_modules` symlinks to the main checkout.
 | `ENV_FILE` | app env file (default `<APP_DIR>/.env`) |
 | `ENV_VAR` | the variable that carries the server URL |
 | `PM` | package manager override |
+| `CLIENT` | `go` or `dev`: overrides the detection; when it disagrees with it, Metro starts with `expo start --go` or `--dev-client` |
+| `ANDROID_PACKAGE`, `EXPO_SLUG` | the dev client's package and slug, when `app.json` does not have them or `app.config.*` changes them. The deep link scheme is `exp+` plus the slug lowercased, keeping only letters, digits, `+`, `-` and `.`, the same rule `expo-dev-client` uses at prebuild |
+| `AVD` | the AVD this project runs on: the `emulator` target uses that emulator even when another one is running, and boots it when it is off |
 | `SERVER_TIMEOUT`, `METRO_TIMEOUT`, `BOOT_TIMEOUT` | seconds to wait for bind / bind / emulator boot (90 / 120 / 360). Fixed: 60 s for the server's first HTTP answer, 60 s for Metro's `/status`, 120 s for the `Bundled` line |
 
 ## Machine config: `~/.config/mobile-up/machine.conf` (never versioned)
@@ -54,7 +59,7 @@ dependencies, `node_modules` symlinks to the main checkout.
 |---|---|
 | `ANDROID_HOME` | SDK root |
 | `ANDROID_AVD_HOME` | directory holding the `.avd` folders when the emulator cannot find them (`Unknown AVD name`) |
-| `AVD` | AVD to boot when several exist |
+| `AVD` | AVD to boot when several exist and no emulator is running (the project's `AVD` wins) |
 
 Environment: `MOBILE_UP_IP=<ip>` overrides the detected LAN IP for one run.
 
@@ -66,13 +71,15 @@ Arguments: `--server-port N`, `--metro-port N` override the base ports for one r
 When the base port belongs to a foreign process, the next free port above it (up to +20) is used. The server
 command is rebuilt by replacing the literal port in the `dev` script (`next dev --port 3001` →
 `--port 3002`); a script with no literal port runs with `PORT=<alt>` and a warning. Metro on an
-alternate port runs `expo start --clear --port <alt>` from the app directory.
+alternate port runs `expo start --clear --port <alt>` from the app directory (plus `--go` or
+`--dev-client` when `CLIENT` disagrees with the detection).
 
 ## State: `~/.cache/mobile-up/<slug>.state`
 
 `KEY=value`: `TARGET`, `TIME`, `ROOT`, `IP`, `SERVER_PORT`, `SERVER_PID`, `METRO_PORT`,
 `METRO_PID`, `METRO_URL` (the URL baked into the running bundle), `ENV_FILE`, `ENV_VAR`, `URL`,
-`ADB`, `SERIAL`, `AVD`, `EXPO_GO`, `LOG_SERVER`, `LOG_METRO`, `LOG_AVD`. The slug is the main
+`ADB`, `SERIAL`, `AVD`, `CLIENT` (`go` or `dev`), `EXPO_GO` (its version), `DEV_CLIENT` (package
+and version), `LOG_SERVER`, `LOG_METRO`, `LOG_AVD`. The slug is the main
 checkout's name, plus the worktree's name in a linked worktree.
 
 Logs: `~/.cache/mobile-up/<slug>-server.log`, `-metro.log`, `-avd.log`. `~/.cache` rather than
@@ -84,9 +91,9 @@ Logs: `~/.cache/mobile-up/<slug>-server.log`, `-metro.log`, `-avd.log`. `~/.cach
 |---|---|
 | 0 | every requested piece answered |
 | 2 | usage error, host is not Linux, or `ss`, `ip` or `curl` is missing |
-| 3 | project not detected, ambiguous, or preflight failed (dependencies) |
+| 3 | project not detected, ambiguous, preflight failed (dependencies), `CLIENT` not `go` or `dev`, or a dev client project without a slug (`app`, `emulator`) or a package (`emulator`) |
 | 4 | server did not bind, did not answer HTTP (log excerpt printed), no free port above the base, or the env variable could not be written |
 | 5 | Metro did not bind, `/status` never said running, or no free port above the base |
-| 6 | emulator: SDK, emulator binary or AVD missing, several AVDs without `AVD` set, boot timeout, Expo Go missing, `am start` failed, busy with another Metro, or no `Bundled` line |
+| 6 | emulator: SDK, emulator binary or AVD missing, several AVDs without `AVD` set, boot timeout, Expo Go missing, dev client missing or not a development build (the message says how to install one), `am start` failed, busy with another Metro, or no `Bundled` line |
 
 The summary is printed even on 6, so the server and Metro lines stay usable.

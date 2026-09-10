@@ -45,6 +45,24 @@ The package name is load-bearing: without `host.exp.exponent` the intent opens t
 the app already open, a deep link navigates but does not remount: state, scroll and selection
 persist. Changing `font_scale` or reloading from the dev menu restarts on the initial route.
 
+With a dev client the package is the app's own and the link carries the Metro URL, encoded:
+
+```bash
+timeout 20 "$ADB" -s "$SERIAL" shell am force-stop <package>
+sleep 3
+timeout 20 "$ADB" -s "$SERIAL" shell am start -a android.intent.action.VIEW -d "'exp+<slug>://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A<metro-port>'" <package>
+```
+
+The inner single quotes keep the device shell from globbing the `?`. `10.0.2.2` works here and
+needs no `adb reverse`, which only redirects the device's own `localhost` (measured on 2026-09-10:
+a debug build of an SDK 57 app loaded its bundle from `http://10.0.2.2:8081` on an API 35 AVD). `localhost` plus
+`adb reverse tcp:<port> tcp:<port>` also works, and is the way when Metro runs with `--localhost`:
+it binds `localhost`, which on some hosts resolves to `::1` only (seen on this skill's Linux host),
+and then `10.0.2.2`, the host's IPv4 loopback, finds nothing listening. The dev client
+loads nothing from Metro when the installed APK is a release or preview build of the same package:
+`dumpsys package <package> | grep pkgFlags` must show `DEBUGGABLE`. The first open after an install
+shows the dev menu onboarding and a permission prompt over the app; capture after dismissing them.
+
 ## Taps: capture, read, then tap
 
 ```bash
@@ -56,7 +74,7 @@ Coordinates belong to the screen you last read. Any event that remounts (reload,
 in" button in a real session and wrote a real row. When the focused screen is in doubt:
 
 ```bash
-timeout 20 "$ADB" -s "$SERIAL" shell dumpsys window | grep -m1 mCurrentFocus   # ExperienceActivity = the app; HomeActivity = Expo Go home
+timeout 20 "$ADB" -s "$SERIAL" shell dumpsys window | grep -m1 mCurrentFocus   # ExperienceActivity = the app; HomeActivity = Expo Go home; dev client: <package>/.MainActivity
 ```
 
 Expo Go's floating dev button floats over the app near the top-right (measured once on a
@@ -91,5 +109,6 @@ timeout 20 "$ADB" -s "$SERIAL" shell settings delete secure stylus_handwriting_e
 - JS console and errors: `timeout 20 "$ADB" -s "$SERIAL" logcat -d -s ReactNativeJS:I | tail -40`
 - Native crash after a bundle: `timeout 20 "$ADB" -s "$SERIAL" logcat -b crash -d | tail -40`
 - Which Metro the open app came from: `timeout 20 "$ADB" -s "$SERIAL" logcat -d -s ReactNativeJS:I | grep 'Running "main"' | tail -1`
-  (the `initialUri` field). Another session's port there means the emulator is theirs right now:
-  `coexistence.md`.
+  (the `initialUri` field). The dev client logs that line without it; read the launch intent instead:
+  `timeout 20 "$ADB" -s "$SERIAL" shell dumpsys activity activities | grep "cmp=<package>/" | grep -m1 -o 'dat=[^ ]*'`.
+  Another session's port there means the emulator is theirs right now: `coexistence.md`.

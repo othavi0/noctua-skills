@@ -4,8 +4,9 @@
 #
 # Usage: mobile-up.sh [server|app|emulator|status] [--server-port N] [--metro-port N] [--take-emulator]
 #   server    dev server only
-#   app       dev server + Metro (default) — test on a phone with Expo Go
+#   app       dev server + Metro (default) — test on a phone with Expo Go or the project's dev client
 #   emulator  dev server + Metro + Android emulator, app opened with a fresh bundle
+#             (Expo Go, or the development build when the app depends on expo-dev-client)
 #   status    who holds the ports, env vs bundle, devices — changes nothing
 #   --take-emulator   replace an app another Metro opened on the emulator (ask the user first)
 #
@@ -32,8 +33,8 @@ while [ $# -gt 0 ]; do
     --server-port) SERVER_PORT_ARG="${2:-}"; case "$SERVER_PORT_ARG" in ''|*[!0-9]*) die 2 "--server-port needs a number, got '${SERVER_PORT_ARG}'";; esac; shift ;;
     --metro-port) METRO_PORT_ARG="${2:-}"; case "$METRO_PORT_ARG" in ''|*[!0-9]*) die 2 "--metro-port needs a number, got '${METRO_PORT_ARG}'";; esac; shift ;;
     --take-emulator) TAKE_EMULATOR=1 ;;
-    -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
-    *) printf 'mobile-up: unknown argument "%s"\n' "$1"; sed -n '5,10p' "$0"; exit 2 ;;
+    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
+    *) printf 'mobile-up: unknown argument "%s"\n' "$1"; sed -n '5,11p' "$0"; exit 2 ;;
   esac
   shift
 done
@@ -140,6 +141,21 @@ expo_go_compatible() { # expo_go_version project_sdk_major -> 0 compatible, 1 in
   esac
 }
 
+app_url() { # host port -> the URL the client opens: exp:// for Expo Go, the dev client deep link otherwise
+  if [ "$CLIENT" = "dev" ]; then printf '%s://expo-development-client/?url=http%%3A%%2F%%2F%s%%3A%s' "$DEV_SCHEME" "$1" "$2"
+  else printf 'exp://%s:%s' "$1" "$2"; fi
+}
+
+first_emulator() { timeout 15 "$ADB" devices 2>/dev/null | grep -oP '^emulator-\d+(?=\s+device$)' | head -1; }
+
+serial_of_avd() { # avd -> serial of the running emulator booted from that AVD
+  local s
+  for s in $(timeout 15 "$ADB" devices 2>/dev/null | grep -oP '^emulator-\d+(?=\s+device$)'); do
+    [ "$(timeout 10 "$ADB" -s "$s" emu avd name 2>/dev/null | head -1 | tr -d '\r')" = "$1" ] && { printf '%s' "$s"; return 0; }
+  done
+  return 1
+}
+
 find_ours_port() { # base -> port in [base, base+20] whose listener runs under ROOT (our earlier run), or nothing
   local p="$1" i pid
   for i in $(seq 0 20); do
@@ -190,6 +206,34 @@ else
   APP_DIR="$CANDS"
 fi
 [ -f "$APP_DIR/package.json" ] || die 3 "APP_DIR $APP_DIR has no package.json"
+
+# client: Expo Go, or the project's development build when the app depends on expo-dev-client
+CLIENT_DETECTED="go"; grep -qE '"expo-dev-client"[[:space:]]*:' "$APP_DIR/package.json" && CLIENT_DETECTED="dev"
+CLIENT="$(conf_get "$CONF" CLIENT || true)"
+case "$CLIENT" in '') CLIENT="$CLIENT_DETECTED" ;; go|dev) ;; *) die 3 "CLIENT in $CONF must be go or dev, got '$CLIENT'" ;; esac
+CLIENT_FLAG=""   # expo start already picks the client from expo-dev-client; force it only when the config disagrees
+if [ "$CLIENT" != "$CLIENT_DETECTED" ]; then
+  if [ "$CLIENT" = "dev" ]; then CLIENT_FLAG="--dev-client"; else CLIENT_FLAG="--go"; fi
+fi
+DEV_PKG=""; DEV_SLUG=""; DEV_SCHEME=""
+if [ "$CLIENT" = "dev" ]; then
+  DEV_PKG="$(conf_get "$CONF" ANDROID_PACKAGE || true)"
+  DEV_SLUG="$(conf_get "$CONF" EXPO_SLUG || true)"
+  if { [ -z "$DEV_PKG" ] || [ -z "$DEV_SLUG" ]; } && [ -f "$APP_DIR/app.json" ] && have node; then
+    J="$(node -e 'const j=require(process.argv[1]),e=j.expo||j;console.log(e.slug||"",(e.android||{}).package||"")' "$APP_DIR/app.json" 2>/dev/null)"
+    [ -z "$DEV_SLUG" ] && DEV_SLUG="$(printf '%s' "$J" | cut -d' ' -f1)"
+    [ -z "$DEV_PKG" ] && DEV_PKG="$(printf '%s' "$J" | cut -s -d' ' -f2)"
+  fi
+  # expo-dev-client registers exp+<slug> with the slug lowercased and cut to [a-z0-9+.-] (getDefaultScheme)
+  [ -n "$DEV_SLUG" ] && DEV_SCHEME="exp+$(printf '%s' "$DEV_SLUG" | tr -cd 'A-Za-z0-9+.-' | tr 'A-Z' 'a-z')"
+  # app needs the slug (the link in the QR); emulator also needs the package it opens on the device
+  if { [ "$TARGET" = "app" ] || [ "$TARGET" = "emulator" ]; } && [ -z "$DEV_SLUG" ]; then
+    die 3 "dev client: no slug in ${APP_DIR#"$ROOT"/}/app.json (app.config.* is not evaluated). Set EXPO_SLUG in $CONF."
+  fi
+  if [ "$TARGET" = "emulator" ] && [ -z "$DEV_PKG" ]; then
+    die 3 "dev client: no android.package in ${APP_DIR#"$ROOT"/}/app.json (app.config.* is not evaluated). Set ANDROID_PACKAGE in $CONF."
+  fi
+fi
 
 # dev server: directory, dev script, port
 SERVER="$(conf_get "$CONF" SERVER || true)"          # "none" disables the server
@@ -281,7 +325,7 @@ if [ -n "$IP" ] && [ -n "$IP_DEV" ]; then
     warn "default route goes through $IP_DEV (VPN?): $IP may be unreachable from a phone on the Wi-Fi. Override with MOBILE_UP_IP=<lan-ip>." ;;
   esac
 fi
-[ -z "$IP" ] && [ "$TARGET" = "app" ] && warn "no LAN IP (no default route?): the exp:// URL and QR below will be missing the host address"
+[ -z "$IP" ] && [ "$TARGET" = "app" ] && warn "no LAN IP (no default route?): the app URL and QR below will be missing the host address"
 
 # ----------------------------------------------------------------------------- state (previous run)
 prev() { conf_get "$STATE" "$1" || true; }
@@ -302,6 +346,8 @@ if [ "$TARGET" = "status" ]; then
   say "== mobile-up status ($SLUG) =="
   say "root     $ROOT"
   say "app      ${APP_DIR#"$ROOT"/}   pm $PM"
+  if [ "$CLIENT" = "dev" ]; then say "client   dev client ${DEV_PKG:-?} (scheme ${DEV_SCHEME:-?})$( [ -n "$CLIENT_FLAG" ] && printf ', forced by CLIENT in the config')"
+  else say "client   Expo Go$( [ -n "$CLIENT_FLAG" ] && printf ', forced by CLIENT in the config')"; fi
   [ "$SERVER" != "none" ] && say "server   ${SERVER_DIR#"$ROOT"/}   dev script: ${DEV_SCRIPT:-?}"
   say "ip       ${IP:-none}${IP_DEV:+ via $IP_DEV}${IP_NET:+ net $IP_NET}"
   [ "$SERVER" != "none" ] && owner_line "$SERVER_PORT_BASE" "server  "
@@ -446,8 +492,8 @@ if [ "$TARGET" != "server" ]; then
     METRO_PORT="$ALT"
   fi
   if [ -z "$METRO_PID" ]; then
-    if [ "$METRO_PORT" != "$METRO_PORT_BASE" ] || [ -z "$APP_DEV_SCRIPT" ]; then
-      CMD="expo start --clear --port $METRO_PORT"
+    if [ "$METRO_PORT" != "$METRO_PORT_BASE" ] || [ -z "$APP_DEV_SCRIPT" ] || [ -n "$CLIENT_FLAG" ]; then
+      CMD="expo start --clear --port $METRO_PORT${CLIENT_FLAG:+ $CLIENT_FLAG}"
     else
       CMD="$PM run dev"
     fi
@@ -470,7 +516,7 @@ if [ "$TARGET" != "server" ]; then
 fi
 
 # ----------------------------------------------------------------------------- emulator
-EMU_STATUS="skipped"; EMU_NOTE=""; SERIAL=""; ADB=""; AVD=""; EXPO_GO_VER=""; BUNDLE_NOTE=""
+EMU_STATUS="skipped"; EMU_NOTE=""; SERIAL=""; ADB=""; AVD=""; EXPO_GO_VER=""; DEV_CLIENT=""; BUNDLE_NOTE=""
 if [ "$TARGET" = "emulator" ]; then
   SDK="$(find_sdk || true)"
   if [ -z "$SDK" ]; then
@@ -484,20 +530,21 @@ if [ "$TARGET" = "emulator" ]; then
     done
     [ -n "$AVDH" ] && export ANDROID_AVD_HOME="$AVDH"
     adb_() { timeout 20 "$ADB" -s "$SERIAL" "$@"; }
-    SERIAL="$(timeout 15 "$ADB" devices 2>/dev/null | grep -oP '^emulator-\d+(?=\s+device$)' | head -1)"
+    PAVD="$(conf_get "$CONF" AVD || true)"   # the project's AVD: that emulator, even with another one running
+    if [ -n "$PAVD" ]; then SERIAL="$(serial_of_avd "$PAVD" || true)"; else SERIAL="$(first_emulator)"; fi
     OTHER="$(timeout 15 "$ADB" devices 2>/dev/null | tail -n +2 | grep -E 'offline|unauthorized' || true)"
     [ -n "$OTHER" ] && warn "adb sees a device that is not ready: $OTHER"
     if [ -n "$SERIAL" ]; then
-      EMU_STATUS="reused"; EMU_NOTE="$SERIAL already running"
+      EMU_STATUS="reused"; EMU_NOTE="$SERIAL${PAVD:+ (AVD $PAVD)} already running"; AVD="$PAVD"
     elif [ ! -x "$EMU" ]; then
       EMU_STATUS="failed"; EMU_NOTE="no emulator binary at $EMU"; EXIT=6
     else
-      AVD="$(conf_get "$MCONF" AVD || true)"
+      AVD="${PAVD:-$(conf_get "$MCONF" AVD || true)}"
       if [ -z "$AVD" ]; then
         AVDS="$("$EMU" -list-avds 2>/dev/null | grep -v '^INFO' | grep . || true)"
         N=$(printf '%s\n' "$AVDS" | grep -c . || true)
         if [ "$N" -eq 0 ]; then EMU_STATUS="failed"; EMU_NOTE="no AVD found (ANDROID_AVD_HOME=${ANDROID_AVD_HOME:-unset}); create one or set ANDROID_AVD_HOME in $MCONF"; EXIT=6
-        elif [ "$N" -gt 1 ]; then EMU_STATUS="failed"; EMU_NOTE="several AVDs ($(printf '%s' "$AVDS" | tr '\n' ' ')): set AVD=<name> in $MCONF (ask the user)"; EXIT=6
+        elif [ "$N" -gt 1 ]; then EMU_STATUS="failed"; EMU_NOTE="several AVDs ($(printf '%s' "$AVDS" | tr '\n' ' ')): set AVD=<name> in $CONF for this project or in $MCONF for the machine (ask the user)"; EXIT=6
         else AVD="$AVDS"; fi
       fi
       if [ -n "$AVD" ]; then
@@ -505,7 +552,7 @@ if [ "$TARGET" = "emulator" ]; then
         say "emulator: booting AVD '$AVD' (log $LOG_AVD)"
         i=0
         while [ "$i" -lt "$BOOT_TIMEOUT" ]; do
-          SERIAL="$(timeout 15 "$ADB" devices 2>/dev/null | grep -oP '^emulator-\d+(?=\s+device$)' | head -1)"
+          if [ -n "$PAVD" ]; then SERIAL="$(serial_of_avd "$PAVD" || true)"; else SERIAL="$(first_emulator)"; fi
           [ -n "$SERIAL" ] && [ "$(adb_ shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && break
           i=$((i + 2)); sleep 2
         done
@@ -517,35 +564,69 @@ if [ "$TARGET" = "emulator" ]; then
       fi
     fi
     if [ -n "$SERIAL" ]; then
-      if ! adb_ shell pm path host.exp.exponent 2>/dev/null | grep -q package; then
-        SDKV="$(grep -oP '"expo"\s*:\s*"[~^]?\K[0-9]+' "$APP_DIR/package.json" | head -1)"
-        EMU_STATUS="failed"; EMU_NOTE="$EMU_NOTE; Expo Go is not installed on $SERIAL. Install: npx expo-go download android ${SDKV:-<sdk>} && $ADB -s $SERIAL install -r <apk>"; EXIT=6
-      else
-        EXPO_GO_VER="$(adb_ shell dumpsys package host.exp.exponent 2>/dev/null | grep -m1 versionName | cut -d= -f2 | tr -d '\r ')"
-        SDKV="$(grep -oP '"expo"\s*:\s*"[~^]?\K[0-9]+' "$APP_DIR/package.json" | head -1)"
-        if [ -n "$SDKV" ]; then
-          expo_go_compatible "$EXPO_GO_VER" "$SDKV"
-          [ $? -eq 1 ] && warn "Expo Go $EXPO_GO_VER on $SERIAL vs project SDK $SDKV: expect 'Project is incompatible with this version of Expo Go'. Fix: npx expo-go download android $SDKV && $ADB -s $SERIAL install -r <apk>"
+      READY=0
+      if [ "$CLIENT" = "dev" ]; then
+        APP_PKG="$DEV_PKG"
+        INSTALL_HINT="build and install it with 'npx expo run:android${AVD:+ --device $AVD}' in ${APP_DIR#"$ROOT"/} (a local build takes several minutes: ask the user first), or install a development APK from EAS: $ADB -s $SERIAL install -r <apk>"
+        PKG_DUMP=""; adb_ shell pm path "$DEV_PKG" 2>/dev/null | grep -q package && PKG_DUMP="$(adb_ shell dumpsys package "$DEV_PKG" 2>/dev/null)"
+        if [ -z "$PKG_DUMP" ]; then
+          EMU_STATUS="failed"; EMU_NOTE="$EMU_NOTE; dev client $DEV_PKG is not installed on $SERIAL: $INSTALL_HINT"; EXIT=6
+        elif ! grep -m1 'pkgFlags=' <<<"$PKG_DUMP" | grep -q DEBUGGABLE; then   # here-string: a pipe from printf dies of SIGPIPE on a long dump
+          # a release or preview APK of the same package opens the bundle it carries and never asks Metro
+          EMU_STATUS="failed"; EMU_NOTE="$EMU_NOTE; $DEV_PKG on $SERIAL is not a development build (not debuggable: it runs the bundle inside the APK and ignores Metro); $INSTALL_HINT (a different signature needs 'adb uninstall' first, which wipes the app's data: ask the user)"; EXIT=6
+        else
+          DEV_CLIENT="$DEV_PKG $(grep -m1 versionName <<<"$PKG_DUMP" | cut -d= -f2 | tr -d '\r ')"
+          READY=1
         fi
-        # the emulator is one shared device: another session may be driving Expo Go right now
+      else
+        APP_PKG="host.exp.exponent"
+        if ! adb_ shell pm path host.exp.exponent 2>/dev/null | grep -q package; then
+          SDKV="$(grep -oP '"expo"\s*:\s*"[~^]?\K[0-9]+' "$APP_DIR/package.json" | head -1)"
+          EMU_STATUS="failed"; EMU_NOTE="$EMU_NOTE; Expo Go is not installed on $SERIAL. Install: npx expo-go download android ${SDKV:-<sdk>} && $ADB -s $SERIAL install -r <apk>"; EXIT=6
+        else
+          EXPO_GO_VER="$(adb_ shell dumpsys package host.exp.exponent 2>/dev/null | grep -m1 versionName | cut -d= -f2 | tr -d '\r ')"
+          SDKV="$(grep -oP '"expo"\s*:\s*"[~^]?\K[0-9]+' "$APP_DIR/package.json" | head -1)"
+          if [ -n "$SDKV" ]; then
+            expo_go_compatible "$EXPO_GO_VER" "$SDKV"
+            [ $? -eq 1 ] && warn "Expo Go $EXPO_GO_VER on $SERIAL vs project SDK $SDKV: expect 'Project is incompatible with this version of Expo Go'. Fix: npx expo-go download android $SDKV && $ADB -s $SERIAL install -r <apk>"
+          fi
+          READY=1
+        fi
+      fi
+      if [ "$READY" -eq 1 ]; then
+        # the emulator is one shared device: another session may be driving an app on it right now,
+        # in Expo Go or in a dev client, whichever client this project uses
         # 10.0.2.2 is Android's alias for the host machine, immune to VPN/firewall on the LAN IP
-        DL="exp://10.0.2.2:$METRO_PORT"
-        CUR_LINE="$(adb_ logcat -d -s ReactNativeJS:I 2>/dev/null | grep -a 'Running "main"' | tail -1)"
-        CUR_URI="$(printf '%s' "$CUR_LINE" | grep -oP '"initialUri":"\K[^"]*')"
-        CUR_HOST="$(printf '%s' "$CUR_URI" | sed -E 's|^exp://([^/]+).*|\1|')"
+        DL="$(app_url 10.0.2.2 "$METRO_PORT")"
         FOCUS="$(adb_ shell dumpsys window 2>/dev/null | grep -m1 mCurrentFocus)"
+        FOCUS_PKG="$(printf '%s' "$FOCUS" | grep -oP ' \K[A-Za-z0-9_.]+(?=/)' | head -1)"
+        CUR_URI=""; CUR_HOST=""; CUR_WHEN=""; CUR_NAME=""
+        if printf '%s' "$FOCUS" | grep -q 'host.exp.exponent/.*ExperienceActivity'; then
+          # Expo Go logs the Metro it opened as initialUri
+          CUR_LINE="$(adb_ logcat -d -s ReactNativeJS:I 2>/dev/null | grep -a 'Running "main"' | tail -1)"
+          CUR_URI="$(printf '%s' "$CUR_LINE" | grep -oP '"initialUri":"\K[^"]*')"
+          CUR_HOST="$(printf '%s' "$CUR_URI" | sed -E 's|^exp://([^/]+).*|\1|')"
+          CUR_WHEN="$(printf '%s' "$CUR_LINE" | cut -c1-18)"; CUR_NAME="Expo Go"
+        elif [ -n "$FOCUS_PKG" ]; then
+          # a dev client logs no initialUri: the Metro it opened rides on its task's launch intent (url=, encoded);
+          # localhost there came through adb reverse, so it is the host machine, the same as 10.0.2.2
+          CUR_URI="$(adb_ shell dumpsys activity activities 2>/dev/null | grep -a "cmp=$FOCUS_PKG/" | grep -m1 -oP 'dat=\K\S*expo-development-client\S*')"
+          CUR_HOST="$(printf '%s' "$CUR_URI" | grep -oP 'url=\K[^&]*' | sed -E 's/%3A/:/gI; s/%2F/\//gI; s/%5B/[/gI; s/%5D/]/gI; s|^https?://||; s|/.*||; s/^(localhost|127\.0\.0\.1|\[::1\]):/10.0.2.2:/')"
+          CUR_NAME="dev client $FOCUS_PKG"
+        fi
         BUSY=0
-        if [ "$TAKE_EMULATOR" -eq 0 ] && [ -n "$CUR_HOST" ] && [ "$CUR_HOST" != "10.0.2.2:$METRO_PORT" ] && printf '%s' "$FOCUS" | grep -q 'host.exp.exponent/.*ExperienceActivity'; then
+        if [ "$TAKE_EMULATOR" -eq 0 ] && [ -n "$CUR_HOST" ] && [ "$CUR_HOST" != "10.0.2.2:$METRO_PORT" ]; then
           BUSY=1
-          EMU_STATUS="busy"; EMU_NOTE="$EMU_NOTE; Expo Go is showing $CUR_URI (launched $(printf '%s' "$CUR_LINE" | cut -c1-18)), another Metro than ours ($DL). Another session may be driving this emulator: ASK THE USER, then rerun with --take-emulator"; EXIT=6
+          EMU_STATUS="busy"; EMU_NOTE="$EMU_NOTE; $CUR_NAME is showing $CUR_URI${CUR_WHEN:+ (launched $CUR_WHEN)}, another Metro than ours ($DL). Another session may be driving this emulator: ASK THE USER, then rerun with --take-emulator"; EXIT=6
         fi
         # open the app with a fresh bundle: force-stop, pause, deep link, then wait for Metro to say Bundled
         BEFORE=0; [ -f "$LOG_METRO" ] && BEFORE=$(wc -l < "$LOG_METRO")
         OUT=""
         if [ "$BUSY" -eq 0 ]; then
-          adb_ shell am force-stop host.exp.exponent >/dev/null 2>&1
+          adb_ shell am force-stop "$APP_PKG" >/dev/null 2>&1
           sleep 3
-          OUT="$(adb_ shell am start -a android.intent.action.VIEW -d "$DL" host.exp.exponent 2>&1)"
+          # single quotes survive into the device shell, where the dev client link's '?' would glob
+          OUT="$(adb_ shell am start -a android.intent.action.VIEW -d "'$DL'" "$APP_PKG" 2>&1)"
         fi
         if [ "$BUSY" -eq 1 ]; then
           :
@@ -574,11 +655,13 @@ fi
 # ----------------------------------------------------------------------------- state (fields this run did not touch keep the previous value)
 [ "$TARGET" = "server" ] && { METRO_PORT="$(prev METRO_PORT)"; METRO_PID="$(prev METRO_PID)"; }
 [ -z "$ADB" ] && ADB="$(prev ADB)"; [ -z "$SERIAL" ] && SERIAL="$(prev SERIAL)"; [ -z "$AVD" ] && AVD="$(prev AVD)"; [ -z "$EXPO_GO_VER" ] && EXPO_GO_VER="$(prev EXPO_GO)"
+DEV_CLIENT_RUN="$DEV_CLIENT"   # the summary shows only what this run found, never a version from the last run
+[ -z "$DEV_CLIENT" ] && DEV_CLIENT="$(prev DEV_CLIENT)"
 {
   printf 'TARGET=%s\nTIME=%s\nROOT=%s\nIP=%s\n' "$TARGET" "$(date '+%F %T')" "$ROOT" "$IP"
   printf 'SERVER_PORT=%s\nSERVER_PID=%s\nMETRO_PORT=%s\nMETRO_PID=%s\nMETRO_URL=%s\n' "${SERVER_PORT:-}" "$SERVER_PID" "${METRO_PORT:-}" "$METRO_PID" "$METRO_URL"
   printf 'ENV_FILE=%s\nENV_VAR=%s\nURL=%s\n' "$ENV_FILE" "$ENV_VAR" "$URL"
-  printf 'ADB=%s\nSERIAL=%s\nAVD=%s\nEXPO_GO=%s\n' "$ADB" "$SERIAL" "$AVD" "$EXPO_GO_VER"
+  printf 'ADB=%s\nSERIAL=%s\nAVD=%s\nCLIENT=%s\nEXPO_GO=%s\nDEV_CLIENT=%s\n' "$ADB" "$SERIAL" "$AVD" "$CLIENT" "$EXPO_GO_VER" "$DEV_CLIENT"
   printf 'LOG_SERVER=%s\nLOG_METRO=%s\nLOG_AVD=%s\n' "$LOG_SERVER" "$LOG_METRO" "$LOG_AVD"
 } > "$STATE"
 
@@ -590,10 +673,11 @@ if [ "$SERVER" != "none" ]; then
   [ -n "$ENV_VAR" ] && say "env       $ENV_VAR=${URL:-?} ($ENV_STATUS)"
 fi
 if [ "$TARGET" != "server" ]; then
-  say "metro     $METRO_STATUS :$METRO_PORT   exp://${IP:-?}:$METRO_PORT"
+  say "metro     $METRO_STATUS :$METRO_PORT   $(app_url "${IP:-?}" "$METRO_PORT")"
 fi
 if [ "$TARGET" = "emulator" ]; then
-  say "emulator  $EMU_STATUS${SERIAL:+   $SERIAL}${EXPO_GO_VER:+   Expo Go $EXPO_GO_VER}"
+  if [ "$CLIENT" = "dev" ]; then say "emulator  $EMU_STATUS${SERIAL:+   $SERIAL}${DEV_CLIENT_RUN:+   dev client $DEV_CLIENT_RUN}"
+  else say "emulator  $EMU_STATUS${SERIAL:+   $SERIAL}${EXPO_GO_VER:+   Expo Go $EXPO_GO_VER}"; fi
   [ -n "$BUNDLE_NOTE" ] && say "bundle    $BUNDLE_NOTE"
   [ -n "$ADB" ] && say "adb       $ADB${SERIAL:+ -s $SERIAL}"
 fi
@@ -601,7 +685,10 @@ say "logs      $LOG_SERVER"; say "          $LOG_METRO"; [ "$TARGET" = "emulator
 say "state     $STATE"
 if [ "$TARGET" = "app" ]; then
   say ""
-  if have qrencode; then qrencode -t ANSIUTF8 "exp://${IP:-?}:$METRO_PORT"; else say "(install qrencode for a QR here, or type exp://${IP:-?}:$METRO_PORT in Expo Go)"; fi
+  if [ "$CLIENT" = "dev" ]; then
+    say "the phone needs the development build of ${DEV_PKG:-this app} installed (Expo Go cannot open this app)"
+    if have qrencode; then qrencode -t ANSIUTF8 "$(app_url "${IP:-?}" "$METRO_PORT")"; else say "(install qrencode for a QR here, or open the dev client and enter http://${IP:-?}:$METRO_PORT)"; fi
+  elif have qrencode; then qrencode -t ANSIUTF8 "exp://${IP:-?}:$METRO_PORT"; else say "(install qrencode for a QR here, or type exp://${IP:-?}:$METRO_PORT in Expo Go)"; fi
   if [ -n "$IP_NET" ]; then
     if systemctl is-active ufw >/dev/null 2>&1; then
       say ""; say "ufw is active. If the phone cannot connect, allow this network (needs sudo, ask the user):"
