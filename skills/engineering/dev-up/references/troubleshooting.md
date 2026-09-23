@@ -89,5 +89,5 @@ done
 echo "SERVER dropped on port PORT — ask me to start it again"
 ```
 
-`persistent: true` (that's what keeps it alive; any `timeout_ms` is ignored). Two misses (~4s) =
-really down, not a restart.
+`timeout_ms: 1800000`, re-armed on expiry by the same activity rule as the log watcher (`SKILL.md`
+step 3). Two misses (~4s) = really down, not a restart.
