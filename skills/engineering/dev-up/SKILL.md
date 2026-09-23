@@ -168,7 +168,7 @@ immediately, and a dead watcher then falsely reports itself as armed):
 mkdir -p ~/.cache/dev-up && [ -f ~/.cache/dev-up/PORT.log ] || : > ~/.cache/dev-up/PORT.log
 ```
 
-One Monitor, persistent, filtering the log for trouble:
+One Monitor, filtering the log for trouble:
 
 ```bash
 tail -n 0 -f ~/.cache/dev-up/PORT.log | grep -E --line-buffered \
@@ -188,10 +188,13 @@ with the pattern added to the exclusion filter, and append it to the `.state` fi
 field (step 5) so a restored session keeps the same filter instead of re-litigating an alert it
 already dismissed.)
 
-`description: "errors on port PORT"`, **`persistent: true`**: this keeps the watcher alive for the
-whole session. With it set, `timeout_ms` is required by the tool but has no effect on a persistent
-watcher, so don't spend time tuning it. `tail -n 0` = new lines
-only. **No port-polling here** — the
+`description: "errors on port PORT"`, **`timeout_ms: 1800000`**: every Monitor expires, and 30
+minutes is the tool's ceiling. `tail -n 0` = new lines only.
+
+**Re-arm by activity.** When the expiry notice arrives, re-arm right away (same command, with the
+`excluded` patterns) only if the watcher reported an event or the user sent a prompt since the last
+arm. A quiet expiry means nobody is using the server: blank `watcher_task` in the `.state` file and
+re-arm as the first action of the user's next prompt. **No port-polling here** — the
 server's death already re-invokes you via step 2's background task; the Monitor only catches errors
 while it's alive. (Reused a server you didn't start? Its death won't auto-signal — re-check the
 port when you return, or add the port-poll fallback in
@@ -285,9 +288,9 @@ stabilises instead of spamming.
 
 ### 5. Hand control back
 
-1. **Gate on the watcher.** Its proof is the Monitor's own start return — a task id plus
-   *"persistent — runs until TaskStop or session end"*. Got it → the watcher's live. Errored or no
-   task id → re-arm it before reporting anything.
+1. **Gate on the watcher.** Its proof is the Monitor's own start return, `Monitor started (task
+   <id>, expires in …)`. The task id in it → the watcher's live; record it as `WATCHER_TASK`.
+   Errored or no task id → re-arm it before reporting anything.
 2. **Don't reach for `TaskList` to check.** A Monitor is a background process and never appears
    there, so `TaskList` always says "No tasks found" — that's not a failed gate, don't let it tempt
    you into skipping step 1.
@@ -329,7 +332,7 @@ the gate silently.) If yes, in order:
    5 (watcher, tab) run either way, they're yours regardless of who owns the server.
 2. **`owner=self` only.** `TaskStop` the server's background task (just killing the PID lets a
    supervisor respawn it).
-3. `TaskStop` the watcher.
+3. `TaskStop` the watcher, if `watcher_task` isn't blank (a quiet expiry already ended it).
 4. **`owner=self` only.** `fuser -k PORT/tcp` — kills exactly who holds the listening socket
    (`lsof -ti tcp:PORT | xargs kill` would also catch the browser attached to the port). If the
    port keeps coming back, an external supervisor is respawning it: tell the user, don't kill
