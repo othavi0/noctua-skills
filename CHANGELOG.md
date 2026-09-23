@@ -5,6 +5,11 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `dev-up` arma o Monitor com `timeout_ms: 1800000`, porque o `persistent`
+  não existe no Claude Code 2.1.280 e todo Monitor expira em até 30 minutos.
+  Expiração sem evento e sem prompt do usuário espera o próximo prompt para
+  re-armar, e o gate do passo 5 aceita o retorno real do Monitor (issue #5).
+
 - `mobile-up` ganhou suporte a dev client. Com `expo-dev-client` no app, os
   alvos `emulator`, `app` e `status` usam o development build no lugar do Expo
   Go: deep link `exp+<slug>`, guarda de emulador ocupado que lê o cliente em
