@@ -23,8 +23,8 @@ After [`SKILL.md`](../SKILL.md) hands control back, this is how to drive and deb
   (`width`/`height`/`tabId`), then confirm with `javascript_tool` that `window.innerWidth`/
   `innerHeight` actually changed — a one-line check, cheap to run. It failed silently under a
   tiling WM in one measurement (asked for 390px, stayed at 2106 on Hyprland), so verify rather than
-  trust the tool's own success return. Only when the resize doesn't stick, switch to `agent-browser`
-  with a device profile instead of fighting this tab.
+  trust the tool's own success return. When the resize doesn't stick, measure the width inside
+  this tab with a same-origin iframe sized to the target width.
 - **The server is watched; the client is on demand.** The Monitor notifies you on its own — but
   only from the **server log** (stdout). The **client** side (React, `fetch` 4xx/5xx, a browser
   exception) lives in the **browser console**, which the shell can't observe → **no automatic
