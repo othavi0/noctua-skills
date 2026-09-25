@@ -321,10 +321,9 @@ stabilises instead of spamming.
 
 ## Shutting down
 
-When the task is done, `AskUserQuestion` on whether to shut down, recommending "keep it running" —
-closing something the user didn't ask you to close is the costlier mistake. (Running autonomously
-with no one to answer? Assume shutdown once the task is done and say so in the handback, don't skip
-the gate silently.) If yes, in order:
+Server, watcher and tab belong to the user and stay up until the user asks to shut them down:
+closing something the user didn't ask you to close is the costlier mistake. Running autonomously,
+leave everything running and say so in the handback. When the user asks, in order:
 
 1. **Read `owner` from the `.state` file first.** `owner=reused` means step 1 found this server
    already running and you never started it: skip steps 2 and 4 below, the server itself and its

@@ -5,6 +5,10 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `dev-up` não desliga mais servidor, watcher e aba por conta própria ao fim
+  de uma tarefa autônoma. Eles ficam de pé até o usuário pedir, também quando
+  não há ninguém para responder, e o handback diz que ficaram rodando.
+
 - `dev-up` arma o Monitor com `timeout_ms: 1800000`, porque o `persistent`
   não existe no Claude Code 2.1.280 e todo Monitor expira em até 30 minutos.
   Expiração sem evento e sem prompt do usuário espera o próximo prompt para
