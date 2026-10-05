@@ -5,10 +5,12 @@ startup misbehaves.
 
 ## Won't bind / errors on launch
 
-- **Missing-module / dependency error.** Common in a fresh checkout or worktree — the deps aren't
-  installed. Install with the lockfile's package manager and retry once:
-  `package-lock.json`→`npm i`, `pnpm-lock.yaml`→`pnpm i`, `yarn.lock`→`yarn`,
-  `bun.lockb`/`bun.lock`→`bun i`.
+- **Missing-module / dependency error.** The deps aren't installed, or a branch added packages
+  that the main checkout lacks. Rerun `preflight` and run its `run` line. A `node_modules`
+  symlinked from another checkout breaks Turbopack (`FATAL`, "points out of the filesystem root")
+  and serves the main checkout's workspace packages: delete the symlink and install.
+- **`ModuleNotFoundError` in a Python app that has a `.venv`.** The launch ran the `python` a
+  version manager put on `PATH`. Launch through `serve`, which puts `.venv/bin` first.
 - **"Another server is already running" despite a FREE port.** Some dev servers (e.g. recent Next)
   allow only *one* instance per directory, regardless of port — there's another instance in the
   same dir on another port. Offer to reuse it or take it down (with confirmation); don't force it.
@@ -16,6 +18,15 @@ startup misbehaves.
   dev` in a terminal, a process manager) is respawning it. Don't kill blindly — tell the user.
 
 ## Runs, but behaves wrong
+
+- **Login vanishes after a port change.** The session cookie belongs to `host:port`. To prove
+  another worktree, use Restart on the same port instead of a second port.
+- **OAuth returns to the production domain** (a Supabase Site URL, a Google redirect URI). Copy the
+  `?code=...` from that URL onto `http://localhost:PORT/<callback route>?code=...` in the same tab.
+  The code works once and expires in minutes.
+- **An edited CSS file changes nothing in the tab.** A Tailwind `--watch` inside the dev script can
+  stop without logging an error. Compare the mtime of the generated CSS with the source before you
+  trust a measurement.
 
 - **An edited `.env`/config doesn't take effect.** A running server won't pick up env changes, and
   a server you launched in the background inherits the *launching shell's* env — which a version
@@ -30,15 +41,26 @@ startup misbehaves.
   to :3001, so login/CORS may break on :PORT." **Don't turn this into an `AskUserQuestion`** that
   re-asks a port they already gave — that's a wasted round-trip, not a real choice. (Only when *you*
   pick the port — they gave none — prefer the pinned one and say why in a line.)
-- **The background server dies when the launching process exits or pauses** — notably while it's
-  off dispatching long-running subagents. If *you* launched it with `run_in_background` (the normal
-  path), the harness re-invokes you when that task exits, so the death is signalled for free. When
-  you come back from long subagent work, a session restart, or a context compaction, **restore the
-  whole contract, not just the port**: read `~/.cache/dev-up/PORT.state` (written at handback) and
-  verify all four pieces — port listening, server task, watcher alive, `TARGET_TAB_ID` still on the
-  right URL. In audited sessions the server was relaunched while the watcher stayed dead for a day,
-  and a compaction silently swapped the pinned port (5001 → 5000); re-checking only `ss` catches
-  neither.
+
+## `wait` verdicts
+
+- `DIED`: the process `serve` started is gone. The log tail says why.
+- `HTTP_5XX`: the server runs but its root throws. Fix the error in the log before the tab.
+- `BUSY_OTHER pid=N`: another process holds the port, so this `serve` could not bind. Run `owner`.
+- `BOUND_NO_HTTP`: something listens but does not speak HTTP on `/`. Check the dev command's port.
+- `TIMEOUT`: nothing bound within 4 minutes while the process stayed alive.
+
+## The server task ended with no error in the log
+
+The background task of `serve` exits when the server dies, and the harness tells you. Read the
+reason before relaunching:
+
+- "low on memory", or `Killed` with nothing in the log: the OOM killer or systemd-oomd. Relaunch
+  through Restart with `serve --mem 4G` so the cap applies to the server alone.
+- `SIGTERM` while a subagent was working: a delegate killed it by name. Tell delegates that start
+  servers to launch through `serve` and stop with `stop <port>`, never `pkill -f`.
+- Relaunch only through `serve` in a background task. `nohup`, `setsid` and `disown` detach the
+  server, and its next death reaches no one.
 
 ## The browser tab shows a Chrome "error page" / `claude-in-chrome` calls fail
 
@@ -72,22 +94,3 @@ message. It's an infra hiccup, not a denial: retry the Monitor within the next f
 only at the end of the cycle — and say in one line that you're temporarily running without a
 watcher. A `Bash` blocked the same way twice in a row → ask the user to run it with the `!` prefix
 instead of retrying blind.
-
-## Watching a server you didn't start (port-poll fallback)
-
-The default watcher (`SKILL.md` step 3) only tails the log; it relies on step 2's
-`run_in_background` task to signal the server's death. If you **reused** a server another session
-or supervisor started (step 1 was BUSY), there's no such task — its death is invisible. Add a
-second Monitor that polls the port and exits when it drops, so you still get the alert:
-
-```bash
-miss=0
-while true; do
-  if ss -ltn "sport = :PORT" | grep -q LISTEN; then miss=0; else miss=$((miss+1)); [ $miss -ge 2 ] && break; fi
-  sleep 2
-done
-echo "SERVER dropped on port PORT — ask me to start it again"
-```
-
-`timeout_ms: 1800000`, re-armed on expiry by the same activity rule as the log watcher (`SKILL.md`
-step 3). Two misses (~4s) = really down, not a restart.
