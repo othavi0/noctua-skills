@@ -24,8 +24,9 @@ Claude Code.
 Prefer to install by hand? Clone the repo and copy a skill folder into
 `~/.claude/skills` (global) or `.claude/skills` (one project).
 
-Every skill is model-invoked. Type it as a slash command (`/dev-up 3000`) or let
-Claude reach for it when the task fits the description.
+`dev-up` and `claude-md-prune` are model-invoked. Type them as a slash command
+(`/dev-up 3000`) or let Claude reach for them when the task fits the description.
+`mobile-up` and `humanize-pt-br` run only when you type them.
 
 ## Engineering
 
@@ -67,10 +68,13 @@ not, cut it*, and flags the lines that drifted out of sync with the code.
 Portuguese prose from an LLM carries tells: inflated vocabulary, negative
 parallelism, sycophancy, em-dashes everywhere. The catalogue holds 49 marks
 across six families, built from Wikipedia's *Signs of AI writing* adapted to
-PT-BR, Strunk, and a few open humanizer catalogues. Every rewrite runs a
-four-step engine (detect, draft, self-audit, deliver) and refuses to invent a
-fact the source does not carry. Feed it a sample of your own writing and it
-calibrates the voice against that instead of the defaults.
+PT-BR, Strunk, and a few open humanizer catalogues. The nine marks that kept
+slipping into published PRs sit in `SKILL.md` itself, and `scripts/scan.py`
+catches the mechanical ones (dashes, arrows, "não é X. É Y", bold labels) before
+the text goes out. It refuses to invent a fact the source does not carry, and
+that includes hours spent and a "never" softened to "rarely". Feed it a sample
+of your own writing and it calibrates the voice against that instead of the
+defaults.
 
 ---
 
