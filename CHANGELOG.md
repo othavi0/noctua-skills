@@ -5,6 +5,10 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `dev-up` não desliga mais servidor, watcher e aba por conta própria ao fim
+  de uma tarefa autônoma. Eles ficam de pé até o usuário pedir, também quando
+  não há ninguém para responder, e o handback diz que ficaram rodando.
+
 - `dev-up` não indica mais outra ferramenta de browser quando o `resize_window`
   falha. A largura exata se mede na própria aba, com um iframe de mesma origem.
 
