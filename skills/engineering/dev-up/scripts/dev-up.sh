@@ -139,8 +139,12 @@ cmd_preflight() {
   local file key port
   for file in "$dir"/.env "$dir"/.env.local "$dir"/.env.development "$dir"/.env.development.local; do
     [ -f "$file" ] || continue
-    sed -nE 's#^([A-Za-z_][A-Za-z0-9_]*(URL|ORIGIN|CALLBACK|REDIRECT|SITE|HOST)[A-Za-z0-9_]*)=["'"'"']?https?://(localhost|127\.0\.0\.1):([0-9]+).*#\1 \4#p' "$file" |
-      while read -r key port; do say "warn pinned port: $(basename "$file") $key expects port $port"; done
+    sed -nE 's#^(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)=["'"'"']?https?://(localhost|127\.0\.0\.1):([0-9]+).*#\2 \4#p' "$file" |
+      while read -r key port; do
+        case "$key" in *SUPABASE*|*API*|*DATABASE*|*DB_*|*REDIS*|*POSTGRES*|*MONGO*) continue ;; esac
+        case "$key" in *AUTH*|*SITE*|*APP_URL*|*BASE_URL*|*PUBLIC_URL*|*FRONTEND*|*WEB_URL*|*ORIGIN*|*CALLBACK*|*REDIRECT*) ;; *) continue ;; esac
+        say "warn pinned port: $(basename "$file") $key expects port $port"
+      done
   done
   return 0
 }
@@ -173,7 +177,7 @@ cmd_serve() {
 cmd_wait() {
   local port="$1" log pidf sp lp code end i=0
   log=$(f "$port" log); pidf=$(f "$port" pid)
-  end=$(($(date +%s) + 540))
+  end=$(($(date +%s) + 240))
   while :; do
     sp=$(cat "$pidf" 2>/dev/null)
     if ! alive "$sp"; then
@@ -205,21 +209,23 @@ cmd_watch() {
   sp=$(cat "$(f "$port" pid)" 2>/dev/null)
   if ! alive "$sp" || ! descends "$(listener_pid "$port")" "$sp"; then
     say "dev-up: port $port was not started by serve; this watcher reports only the server going down"
-    ( while bound "$port"; do sleep 5; done; say "dev-up: SERVER DOWN on port $port" ) &
   fi
+  trap 'pkill -P $$ 2>/dev/null; exit 0' TERM INT HUP
+  ( while bound "$port"; do sleep 5; done; say "dev-up: SERVER DOWN on port $port" ) &
   tail -n 0 -F "$(f "$port" log)" 2>/dev/null \
     | grep -E --line-buffered "$ERRORS" \
     | grep -vE --line-buffered "$NOISE" \
-    | grep -vF --line-buffered -f "$exc"
+    | grep -vF --line-buffered -f "$exc" &
+  wait
 }
 
 cmd_stop() {
   local port="$1" force="${2:-}" sp lp p i
   need_tool
-  bound "$port" || { say STOPPED; return 0; }
   sp=$(cat "$(f "$port" pid)" 2>/dev/null)
+  bound "$port" || alive "$sp" || { say STOPPED; return 0; }
   lp=$(listener_pid "$port")
-  if alive "$sp" && descends "$lp" "$sp"; then
+  if alive "$sp" && { [ -z "$lp" ] || descends "$lp" "$sp"; }; then
     for p in $(tree "$sp"); do kill -TERM "$p" 2>/dev/null; done
   elif [ "$force" = --force ]; then
     [ -n "$lp" ] || die 3 "cannot see the listener's pid (another user's process?)"
@@ -227,7 +233,10 @@ cmd_stop() {
   else
     die 3 "port $port is held by pid ${lp:-?}, which serve did not start; ask the user, then use --force"
   fi
-  for i in $(seq 20); do bound "$port" || { rm -f "$(f "$port" pid)"; say STOPPED; return 0; }; sleep 0.5; done
+  for i in $(seq 20); do
+    if ! bound "$port" && ! alive "$sp"; then rm -f "$(f "$port" pid)"; say STOPPED; return 0; fi
+    sleep 0.5
+  done
   say "STILL_BOUND (something respawns it or ignores SIGTERM; tell the user)"; return 1
 }
 
@@ -254,7 +263,10 @@ cmd_state() {
   mkdir -p "$CACHE"; sf=$(f "$port" state)
   case "$op" in
     init)
-      if [ "$(state_owner "$port")" = mine ]; then say "kept: this session already owns $sf"; cat "$sf"; return 0; fi
+      if [ "$(state_owner "$port")" = mine ]; then
+        state_write "$port" "dir=$(toplevel "$PWD")"
+        say "kept: this session already owns $sf"; cat "$sf"; return 0
+      fi
       [ "$(state_get "$port" dir)" = "$(toplevel "$PWD")" ] || rm -f "$(f "$port" exclude)"
       rm -f "$sf" "$(f "$port" paused)"
       state_write "$port" "session=$(session_id)" "dir=$(toplevel "$PWD")"

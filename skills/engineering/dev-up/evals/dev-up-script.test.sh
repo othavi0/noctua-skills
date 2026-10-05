@@ -67,15 +67,26 @@ check "wait reports a death the log never names" "$("$DU" wait $P | head -1)" "D
 check "wait ignores scary text from a live server" "$("$DU" wait $P | head -1)" "READY http=200"
 "$DU" stop $P >/dev/null
 
+"$DU" serve $P -- "sleep 2; exec python3 -m http.server $P" 2>/dev/null &
+sleep 0.5
+check "stop catches a server that has not bound yet" "$("$DU" stop $P)" "STOPPED"
+sleep 2.5
+check "and it never binds later" "$("$DU" owner $P)" "FREE"
+
+setsid "$DU" watch $P >/dev/null 2>&1 & W2=$!
+sleep 1; kill -TERM "$W2"; sleep 0.5
+check "a stopped watcher leaves no tail behind" "$(pgrep -f "tail -n 0 -F $DEV_UP_CACHE/$P.log" | wc -l)" "0"
+
 git -C "$T/app" worktree add -q .claude/worktrees/wt 2>/dev/null
 "$DU" serve $P3 --dir "$T/app/.claude/worktrees/wt" -- "python3 -m http.server $P3" 2>/dev/null &
 "$DU" wait $P3 >/dev/null
 check "a nested worktree is not this checkout" "$("$DU" owner $P3)" "*mine=worktree*"
 "$DU" stop $P3 >/dev/null
 
-printf '%s\n' 'DATABASE_URL=postgresql://u:hunter2@localhost:54322/db' 'NEXTAUTH_URL=http://localhost:3001' >"$T/app/.env"
+printf '%s\n' 'DATABASE_URL=postgresql://u:hunter2@localhost:54322/db' 'export NEXTAUTH_URL=http://localhost:3001' 'NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321' >"$T/app/.env"
 out=$("$DU" preflight "$T/app")
 check "preflight warns about the app origin" "$out" "*NEXTAUTH_URL expects port 3001*"
+check "preflight leaves local services alone" "$(printf '%s' "$out" | grep -c SUPABASE)" "0"
 check "preflight never prints a secret or a database url" "$(printf '%s' "$out" | grep -cE 'hunter2|DATABASE_URL')" "0"
 
 export HOME="$T/home"; unset DEV_UP_CACHE CLAUDE_CODE_SESSION_ID

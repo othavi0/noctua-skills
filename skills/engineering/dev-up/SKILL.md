@@ -156,9 +156,9 @@ found, or `hidden`, which means screenshots and clicks stall until the user brin
 For new code, a new `.env`, or another worktree on the same port. Keep the port: the login cookie
 belongs to `host:port`, so a new port logs the user out.
 
-1. `owner PORT`. With `via=dev-up`, `TaskStop` the `server_task` when this session started it,
-   then `stop PORT`. With `via=other`, ask the user first; on a yes, `stop PORT --force`.
-2. `state PORT init` unless `owner` said `state=mine`.
+1. `owner PORT`. With `via=dev-up`, `stop PORT`, then `TaskStop` the `server_task` when this
+   session started it. With `via=other`, ask the user first; on a yes, `stop PORT --force`.
+2. `state PORT init` from the directory you will serve.
 3. Another worktree → `preflight` there first.
 4. Launch and wait as in step 2.4 and 2.5, with `--dir` pointing at the code to serve. `wait`
    answers `READY` only when the listener descends from this `serve`. Record the new `server_task`.

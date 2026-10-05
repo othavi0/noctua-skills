@@ -4,10 +4,10 @@ Run this only when the user asks. `S` stands for the `bash .../scripts/dev-up.sh
 as `SKILL.md` spells it, with the skill's base directory filled in.
 
 1. `S owner PORT` and `S state PORT show`.
-2. `via=dev-up`: `TaskStop` the `server_task` when this session started it, then `S stop PORT`. It
-   sends SIGTERM to the process tree `serve` started and nothing else. `via=other`: the server was
-   already running before dev-up, so leave it up unless the user names it; then `S stop PORT
-   --force`. `STILL_BOUND` means a supervisor respawns it (a `turbo dev` in a terminal, a process
+2. `via=dev-up`: `S stop PORT`, then `TaskStop` the `server_task` when this session started it.
+   `stop` sends SIGTERM to the process tree `serve` started and nothing else. `via=other`: the
+   server was already running before dev-up, so leave it up unless the user names it; then
+   `S stop PORT --force`. `STILL_BOUND` means a supervisor respawns it (a `turbo dev` in a terminal, a process
    manager): tell the user and leave it.
 3. `TaskStop` the `watcher_task` when `watcher_alive=yes`.
 4. Close the tab with `tabs_close_mcp`, only when the recorded `tab_id` appears in a fresh
