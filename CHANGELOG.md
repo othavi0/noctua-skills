@@ -5,6 +5,14 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `dev-up` ganhou `scripts/dev-up.sh`, que faz a parte mecânica: dono da porta,
+  preflight de worktree, launch, espera, filtro do watcher, `.state` e stop. Um
+  hook `UserPromptSubmit` da skill avisa quando o watcher expirou ou o servidor
+  caiu. A skill ganhou a seção Restart, a sequência fixa da aba e regras para
+  edição de código, browser remoto e porta fixa no `package.json`. O shutdown
+  foi para `references/shutdown.md`, e o `SKILL.md` caiu de 347 para 172
+  linhas. Vem da retro de 30 sessões de 25/08 a 05/10.
+
 - `dev-up` não desliga mais servidor, watcher e aba por conta própria ao fim
   de uma tarefa autônoma. Eles ficam de pé até o usuário pedir, também quando
   não há ninguém para responder, e o handback diz que ficaram rodando.

@@ -1,5 +1,11 @@
 # First-run setup — connect the browser
 
+## ToolSearch returns no `mcp__claude-in-chrome__*` tool
+
+The extension is not connected to this session, which says nothing about whether this machine has
+Chrome. Ask the user to run `/chrome` and pick Reconnect, then load the tools again. Go on to the
+steps below only when `list_connected_browsers` then returns no browser.
+
 Reach here from [`SKILL.md`](../SKILL.md) step 4 when `list_connected_browsers` returns **no
 browsers** (or the call errors): the claude-in-chrome extension isn't installed, isn't signed in, or
 no browser is paired on this machine. This is a once-per-machine bootstrap — after it, the normal

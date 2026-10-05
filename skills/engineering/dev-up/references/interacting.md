@@ -8,7 +8,9 @@ After [`SKILL.md`](../SKILL.md) hands control back, this is how to drive and deb
   *visual* (layout, CSS, render). The **first navigation to a route triggers an on-demand compile**
   (Vite/Turbopack/webpack); while it runs the renderer is busy and `screenshot`/CDP actions time
   out ("renderer busy"). Wait for the route to settle (or retry once); during the build, prefer
-  text or `javascript_tool` reads.
+  text or `javascript_tool` reads. A screenshot or click that times out on a settled route: read
+  `document.visibilityState`. `hidden` means the tab sits behind another one, and the browser
+  throttles it until the user brings it forward; ask them to.
 - **Refs > coordinates.** Click via a `read_page`/`find` ref, never a hardcoded pixel coordinate —
   coordinates drift after any DOM change (a navigation, a sheet/modal opening, a list re-render, an
   on-demand compile) and the click lands on nothing, so you loop retrying. **Never click a confirm

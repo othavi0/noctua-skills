@@ -17,6 +17,10 @@ goes through it.
 
 - Confirm the URL once when connecting, then use the `tab_id` directly; re-validate only if an
   action fails.
+- Keep `TARGET_TAB_ID` on `localhost:PORT`. Another server or a prototype gets a new tab; create it
+  and let its `navigate` return before you close an older one.
+- `tabs_context_mcp` no longer lists `TARGET_TAB_ID` (the group was recreated): create a tab at the
+  root again and record it with `state PORT set tab_id=<id>`.
 - **Never** act on a `localhost:<other-port>` tab — it's another project/port you opened earlier.
 - **Never close or modify the tab group itself.** Operate only on your own `tab_id`.
 

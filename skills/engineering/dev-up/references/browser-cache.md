@@ -11,11 +11,6 @@ is regenerated each session, so `name` is the stable key; in others (observed in
 generic `"Browser 1/2/3"`, and a name set via `switch_browser` may never appear back in
 `list_connected_browsers`. Checking either field against the cache survives both cases.
 
-## Legacy cache format
-
-A cache file with a single bare line and no `=` predates the two-field format. Treat it as `name=`
-and match by name only; rewrite it to the two-line form on the next miss.
-
 ## `switch_browser` doesn't return a deviceId
 
 Optionally run `switch_browser` on a miss so the user can name the device, but don't rely on that
