@@ -9,32 +9,36 @@ description: >-
 # argument-hint, allowed-tools and hooks are Claude Code fields, not part of the Agent Skills spec.
 # Drop them before uploading this folder to claude.ai or the Skills API.
 argument-hint: "[port]"
-allowed-tools: Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh *)
+allowed-tools:
+  - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh owner *)
+  - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh preflight *)
+  - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh wait *)
+  - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh watch *)
+  - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh state *)
 hooks:
   UserPromptSubmit:
     - hooks:
         - type: command
-          command: 'for d in "$CLAUDE_PROJECT_DIR/.claude/skills/dev-up" "$HOME/.claude/skills/dev-up" "$HOME/.agents/skills/dev-up"; do [ -f "$d/scripts/dev-up.sh" ] && exec bash "$d/scripts/dev-up.sh" unwatched; done; true'
+          command: 'p="$HOME/.cache/dev-up/dev-up.sh"; [ -f "$p" ] && bash "$p" unwatched; true'
 ---
 
 # dev-up
 
 One dev server on one **port**, one browser **tab** you own at that port, one **watcher** on the
-log. The port is the key: the server binds it, the tab points at it, the log and the state file are
-named after it.
+log. The port is the key: the server binds it, the tab points at it, and every file in
+`~/.cache/dev-up/` is named after it.
 
 `scripts/dev-up.sh` does the mechanical part. Run it as `bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh
 <command> PORT`, exactly that path, so `allowed-tools` matches. Every command prints its verdict on
-the first line (`FREE`, `READY`, `DIED`, ...). The script keeps two files per port:
-`~/.cache/dev-up/PORT.log` and `~/.cache/dev-up/PORT.state`. Write the state only through `state`.
+the first line (`FREE`, `READY`, `DIED`, ...). Write the state only through its `state` command.
 
 `PORT` below is the literal port number.
 
 ## Invocation
 
 - `/dev-up PORT`: the full flow below.
-- The argument is a URL: open a tab on it (step 4.1 and 4.2 with that URL). No server, watcher or
-  state.
+- The argument is a URL: open a tab on it (steps 4.1 to 4.2.5 with that URL). No server, watcher
+  or state.
 - No argument: a `.state` of this checkout with a live port → use that port and say so in one line.
   No `dev` script in the folder → say there is nothing to run. Otherwise ask for the port.
 - Called in the middle of other work, as a proof step: run every step anyway. The handback becomes
@@ -42,44 +46,45 @@ the first line (`FREE`, `READY`, `DIED`, ...). The script keeps two files per po
 
 ## 1. Who holds the port
 
-`owner PORT`:
+`owner PORT` prints `FREE`, or `BUSY pid=N cwd=DIR mine=... via=... state=...`:
 
-- `FREE` → `state PORT init owner=self` (this also replaces a state file left by a dead session),
-  then step 2.
-- `BUSY ... mine=yes` → this checkout already serves it. `state PORT init owner=reused`, skip
-  step 2, go to step 3.
-- `BUSY ... mine=worktree` → another worktree of this repo serves different code. Ask the user:
-  reuse it as is, or run Restart from this checkout.
-- `BUSY ... mine=no` or `mine=?` → a foreign process. Leave it alone and ask the user.
-- `NOTOOL` → neither `ss` nor `lsof` exists. Stop and say so.
+- `FREE` → `state PORT init`, then step 2.
+- `mine=yes state=mine` → this session already set it up. `state PORT show` says which piece is
+  dead: re-run only that step (3 for the watcher, 4 for the tab).
+- `mine=yes`, any other state → this checkout serves it. `state PORT init`, skip step 2. With
+  `via=other` the server writes no log here, and the watcher only reports it going down.
+- `mine=worktree` → another worktree of this repo serves different code. Ask the user: reuse it as
+  is, or run Restart from this checkout.
+- `mine=no` or `mine=?` → a foreign process. Leave it alone and ask the user.
 
 ## 2. Start the server
 
-1. `preflight` in the app's directory. Run every `do` line it prints. A `warn pinned port` line
-   means auth callbacks or CORS expect another port: warn in one line and keep the user's port.
+1. `preflight` in the app's directory. Run every `run` line it prints; a `todo` line needs a
+   decision. A `warn pinned port` line means an auth callback or CORS origin expects another port:
+   warn in one line and keep the user's port.
 2. Find the dev command in the manifest. In a monorepo (`workspaces`, `turbo.json`,
    `pnpm-workspace.yaml`, `nx.json`) the root `dev` starts every app: list the workspaces with a
    `dev` script, ask with `AskUserQuestion` when there is more than one, and launch from that app's
    directory.
 3. Pin the port with the framework's flag (`--port`, `-p`; add Vite's `--strictPort`) or the app's
-   `PORT` env var. When the `dev` script already hardcodes a port, run the script's command through
-   the runner `preflight` named, with the number swapped and the env prefix kept:
-   `TZ=UTC next dev -p 3001` becomes `TZ=UTC bun x next dev -p PORT`. Leave `package.json` as is.
+   `PORT` env var. When the `dev` script already hardcodes a port, run the script's command itself
+   with the number swapped and the env prefix kept: `TZ=UTC next dev -p 3001` becomes
+   `TZ=UTC next dev -p PORT`. `serve` puts the local `node_modules/.bin` and `.venv/bin` first on
+   `PATH`, so the bare binary name resolves. Leave `package.json` as is.
 4. Launch with Bash `run_in_background: true`:
 
    ```bash
    bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh serve PORT --dir <app dir> -- '<dev command>'
    ```
 
-   `serve` puts `.venv/bin` first on `PATH`, appends to the log behind a marker line, and refuses a
-   bound port. Add `--mem 4G` when this machine has killed a dev server before: it runs the command
-   under `systemd-run --user --scope` with that memory cap. After editing `.env` this session,
-   prefix the command with `set -a; . ./.env; set +a;`. The background task ends when the server
-   dies, and that exit is the death alarm, so launch only through `serve`. Then
+   Add `--mem 4G` when this machine has killed a dev server before: it runs the command under
+   `systemd-run --user --scope` with that memory cap. After editing `.env` this session, prefix the
+   command with `set -a; . ./.env; set +a;`. The background task ends when the server dies, and
+   that exit is the death alarm, so launch only through `serve`. Then
    `state PORT set server_task=<task id>`.
-5. Wait with a foreground Bash call and `timeout: 600000`: `wait PORT`. `READY` → step 3. `DIED`,
-   `NOBIND` or `BOUND_NO_HTTP` → read the lines it printed, then
-   [`references/troubleshooting.md`](references/troubleshooting.md).
+5. Wait with a foreground Bash call and `timeout: 600000`: `wait PORT`. `READY` → step 3. Any other
+   verdict (`DIED`, `HTTP_5XX`, `BUSY_OTHER`, `BOUND_NO_HTTP`, `TIMEOUT`) comes with the log tail:
+   read it, then [`references/troubleshooting.md`](references/troubleshooting.md).
 
 ## 3. Arm the watcher
 
@@ -93,20 +98,20 @@ No `mcp__claude-in-chrome__*` tool comes back → [`references/setup.md`](refere
 
 Arm one Monitor: command `bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh watch PORT`, description
 `errors on port PORT`, `timeout_ms: 1800000` (the tool's ceiling). Its return reads `Monitor started
-(task <id>, ...)`: run `state PORT set watcher_task=<id>`. That return is the only proof the
-watcher lives; `TaskList` never lists a Monitor.
+(task <id>, ...)`: run `state PORT set watcher_task=<id>`. `state PORT show` reports
+`watcher_alive` from the watcher's own process; `TaskList` never lists a Monitor.
 
-- Expiry notice after an event or a user prompt since the last arm → re-arm now and record the new
-  id. A quiet expiry → let it lapse. On the user's next prompt the skill's hook prints `port PORT
-  has no live watcher`; re-arm before answering.
-- A real error → report it, and send `PushNotification` when the user is away.
+- Expiry notice after an event or a user prompt since the last arm → re-arm now. A quiet expiry →
+  let it lapse. On the user's next prompt the skill's hook prints `port PORT has no live watcher`;
+  re-arm before answering.
+- A real error → report it.
 - A transient blip (DNS `EAI_AGAIN`, one failed external call, a `DeprecationWarning`) → ignore it.
-- A recurring line that changes nothing the user sees → `state PORT exclude '<pattern>'`, `TaskStop`
-  the watcher, re-arm. Keep HMR errors (`ReferenceError`, `Module not found`) out of `excluded`:
-  after an edit they are real bugs.
+- A recurring line that changes nothing the user sees → `state PORT exclude '<literal text from the
+  line>'`, `TaskStop` the watcher, re-arm. Keep HMR errors (`ReferenceError`, `Module not found`)
+  out of the excludes: after an edit they are real bugs.
 - Before you or a subagent edits code this server serves, installs deps, or runs a migration:
-  `TaskStop` the watcher and `state PORT set watcher_task=`. Re-arm when that round ends (typecheck
-  or tests green).
+  `TaskStop` the watcher and run `state PORT pause`, which keeps the hook quiet. Re-arm when that
+  round ends (typecheck or tests green).
 
 ## 4. Pin the tab
 
@@ -142,8 +147,8 @@ Confirm a URL with `tabs_context_mcp`, never with a screenshot.
 
 ## 5. Hand back
 
-`state PORT show` lists `server_task` (when `owner=self`), `watcher_task` and `tab_id`. Report the
-port, the log path, the tab id, the watcher id, and the smoke result: clean, the boot errors it
+`state PORT show` lists the task ids, the tab id, and whether server and watcher are alive. Report
+the port, the log path, the tab id, the watcher id, and the smoke result: clean, the boot errors it
 found, or `hidden`, which means screenshots and clicks stall until the user brings the tab forward.
 
 ## Restart
@@ -151,19 +156,22 @@ found, or `hidden`, which means screenshots and clicks stall until the user brin
 For new code, a new `.env`, or another worktree on the same port. Keep the port: the login cookie
 belongs to `host:port`, so a new port logs the user out.
 
-1. `TaskStop` the `server_task`, then `stop PORT`. It frees the port only when `owner=self`.
-2. Another worktree → `preflight` there first.
-3. Launch and wait as in step 2.4 and 2.5, with `--dir` pointing at the code to serve. Record the
-   new `server_task`.
-4. Re-arm the watcher only when it expired. Navigate the tab to the root again.
+1. `owner PORT`. With `via=dev-up`, `TaskStop` the `server_task` when this session started it,
+   then `stop PORT`. With `via=other`, ask the user first; on a yes, `stop PORT --force`.
+2. `state PORT init` unless `owner` said `state=mine`.
+3. Another worktree → `preflight` there first.
+4. Launch and wait as in step 2.4 and 2.5, with `--dir` pointing at the code to serve. `wait`
+   answers `READY` only when the listener descends from this `serve`. Record the new `server_task`.
+5. Re-arm the watcher only when `state PORT show` says it is dead. Navigate the tab to the root
+   again.
 
 ## After setup
 
 - Driving or debugging the app through the tab → [`references/interacting.md`](references/interacting.md).
 - Startup trouble, lost login, a server killed without an error →
   [`references/troubleshooting.md`](references/troubleshooting.md).
-- Back after a compaction, a restart or long subagent work → `state PORT show`, then check each
-  piece: `owner PORT`, the watcher id, the tab's URL in `tabs_context_mcp`.
+- Back after a compaction, a restart or long subagent work → `owner PORT` and `state PORT show`,
+  then re-run the step of each dead piece.
 
 ## Shutting down
 

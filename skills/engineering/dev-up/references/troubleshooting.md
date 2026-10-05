@@ -6,9 +6,9 @@ startup misbehaves.
 ## Won't bind / errors on launch
 
 - **Missing-module / dependency error.** The deps aren't installed, or a branch added packages
-  that the main checkout lacks. Rerun `preflight` and run its `do` line. A `node_modules` symlinked
-  from another checkout breaks Turbopack (`FATAL`, "points out of the filesystem root"): delete the
-  symlink and install with the lockfile.
+  that the main checkout lacks. Rerun `preflight` and run its `run` line. A `node_modules`
+  symlinked from another checkout breaks Turbopack (`FATAL`, "points out of the filesystem root")
+  and serves the main checkout's workspace packages: delete the symlink and install.
 - **`ModuleNotFoundError` in a Python app that has a `.venv`.** The launch ran the `python` a
   version manager put on `PATH`. Launch through `serve`, which puts `.venv/bin` first.
 - **"Another server is already running" despite a FREE port.** Some dev servers (e.g. recent Next)
@@ -41,6 +41,14 @@ startup misbehaves.
   to :3001, so login/CORS may break on :PORT." **Don't turn this into an `AskUserQuestion`** that
   re-asks a port they already gave — that's a wasted round-trip, not a real choice. (Only when *you*
   pick the port — they gave none — prefer the pinned one and say why in a line.)
+
+## `wait` verdicts
+
+- `DIED`: the process `serve` started is gone. The log tail says why.
+- `HTTP_5XX`: the server runs but its root throws. Fix the error in the log before the tab.
+- `BUSY_OTHER pid=N`: another process holds the port, so this `serve` could not bind. Run `owner`.
+- `BOUND_NO_HTTP`: something listens but does not speak HTTP on `/`. Check the dev command's port.
+- `TIMEOUT`: nothing bound within 9 minutes while the process stayed alive.
 
 ## The server task ended with no error in the log
 
@@ -86,22 +94,3 @@ message. It's an infra hiccup, not a denial: retry the Monitor within the next f
 only at the end of the cycle — and say in one line that you're temporarily running without a
 watcher. A `Bash` blocked the same way twice in a row → ask the user to run it with the `!` prefix
 instead of retrying blind.
-
-## Watching a server you didn't start (port-poll fallback)
-
-The default watcher (`SKILL.md` step 3) only tails the log; it relies on the background task of
-`serve` to signal the server's death. If you **reused** a server another session
-or supervisor started (step 1 was BUSY), there's no such task — its death is invisible. Add a
-second Monitor that polls the port and exits when it drops, so you still get the alert:
-
-```bash
-miss=0
-while true; do
-  if ss -ltn "sport = :PORT" | grep -q LISTEN; then miss=0; else miss=$((miss+1)); [ $miss -ge 2 ] && break; fi
-  sleep 2
-done
-echo "SERVER dropped on port PORT — ask me to start it again"
-```
-
-`timeout_ms: 1800000`, re-armed on expiry by the same activity rule as the log watcher (`SKILL.md`
-step 3). Two misses (~4s) = really down, not a restart.
