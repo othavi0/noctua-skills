@@ -44,23 +44,24 @@ startup misbehaves.
 
 ## `wait` verdicts
 
-- `DIED`: the process `serve` started is gone. The log tail says why.
+- `DIED`: the unit `dev-up-PORT` that `serve` started is gone. The log tail says why.
 - `HTTP_5XX`: the server runs but its root throws. Fix the error in the log before the tab.
 - `BUSY_OTHER pid=N`: another process holds the port, so this `serve` could not bind. Run `owner`.
 - `BOUND_NO_HTTP`: something listens but does not speak HTTP on `/`. Check the dev command's port.
 - `TIMEOUT`: nothing bound within 4 minutes while the process stayed alive.
 
-## The server task ended with no error in the log
+## The server went down with no error in the log
 
-The background task of `serve` exits when the server dies, and the harness tells you. Read the
-reason before relaunching:
+The watcher prints `SERVER DOWN`, or the hook says the server is down. `journalctl --user -u
+dev-up-PORT` keeps the unit's exit reason after the unit is gone. Read it before relaunching:
 
-- "low on memory", or `Killed` with nothing in the log: the OOM killer or systemd-oomd. Relaunch
-  through Restart with `serve --mem 4G` so the cap applies to the server alone.
+- `oom-kill`, or `Killed` with nothing in the log: the kernel OOM killer, systemd-oomd, or the
+  unit's own `MemoryMax`. Relaunch through Restart with `serve --mem 4G` so the cap applies to the
+  server alone, or raise the cap.
 - `SIGTERM` while a subagent was working: a delegate killed it by name. Tell delegates that start
   servers to launch through `serve` and stop with `stop <port>`, never `pkill -f`.
-- Relaunch only through `serve` in a background task. `nohup`, `setsid` and `disown` detach the
-  server, and its next death reaches no one.
+- Relaunch only through `serve`. `nohup`, `setsid` and `disown` put the server outside the unit,
+  so `stop`, `wait` and `owner` no longer see it as this skill's server.
 
 ## The browser tab shows a Chrome "error page" / `claude-in-chrome` calls fail
 

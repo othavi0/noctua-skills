@@ -5,6 +5,15 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `dev-up` sobe o servidor como unidade `dev-up-PORT` do systemd do usuário,
+  fora das tasks de background do Claude Code. O limite de tempo e a limpeza
+  por pouca memória do Claude Code não derrubam mais o servidor. O `serve`
+  passa o ambiente do shell para a unidade e retorna na hora; `--mem` vira o
+  `MemoryMax` da unidade. O hook não pede mais rearme do watcher: imprime os
+  erros do log desde o último prompt. O primeiro `browser_batch` começa com
+  `navigate`, e um servidor com cwd apagado (worktree removido) cai sem
+  pergunta, com PID e cwd no relatório. Vem da retro de 23/09 a 07/10.
+
 - `dev-up` ganhou `scripts/dev-up.sh`, que faz a parte mecânica: dono da porta
   pela árvore de processos, preflight de worktree, launch, espera pelo pid do
   servidor, filtro do watcher, `.state` por sessão e stop por SIGTERM. Um hook
