@@ -13,7 +13,10 @@ check() { if [[ "$2" == $3 ]]; then echo "ok   $1"; else echo "FAIL $1: got '$2'
 serve() { timeout 10 "$DU" serve "$@"; }
 active() { systemctl --user is-active "dev-up-$1" 2>/dev/null; }
 cleanup() {
-  for p in $P $P2 $P3; do systemctl --user stop "dev-up-$p" 2>/dev/null; pkill -f "http.server $p" 2>/dev/null; done
+  for p in $P $P2 $P3; do
+    systemctl --user stop "dev-up-$p" 2>/dev/null; systemctl --user reset-failed "dev-up-$p" 2>/dev/null
+    pkill -f "http.server $p" 2>/dev/null
+  done
   [ -n "${WATCH:-}" ] && kill -- -"$WATCH" 2>/dev/null
   rm -rf "$T"
 }
@@ -84,6 +87,13 @@ check "stop refuses a listener serve did not start" "$("$DU" stop $P2 2>&1; echo
 check "serve refuses and wait reports it" "$("$DU" serve $P2 -- true 2>/dev/null; "$DU" wait $P2 | tr '\n' ' ')" "DIED*port $P2 is already bound*"
 check "stop --force frees a foreign listener" "$("$DU" stop $P2 --force)" "STOPPED"
 
+mkdir "$T/live (deleted)"
+(cd "$T/live (deleted)" && exec python3 -m http.server $P2 >/dev/null 2>&1) &
+for _ in $(seq 20); do ss -ltnH "sport = :$P2" | grep -q . && break; sleep 0.25; done
+check "a live dir named '* (deleted)' is not an orphan" "$("$DU" owner $P2)" "*mine=no*"
+check "and stop still asks before killing it" "$("$DU" stop $P2 2>&1; echo "exit=$?")" "*exit=3"
+"$DU" stop $P2 --force >/dev/null
+
 setsid "$DU" watch $P >"$T/events" & WATCH=$!
 sleep 1
 systemctl --user stop "dev-up-$P" 2>/dev/null
@@ -94,9 +104,38 @@ serve $P -- "python3 -m http.server $P" >/dev/null 2>&1
 "$DU" wait $P >/dev/null
 check "stop frees the server serve started" "$("$DU" stop $P)" "STOPPED"
 check "stop removes the unit" "$(active $P)" "inactive"
+: >"$DEV_UP_CACHE/$P.pid"
 check "unwatched reports a dead server once" "$("$DU" unwatched)" "*server on port $P is down*"
 check "and then clears its state" "$("$DU" unwatched)" ""
-check "the server-down branch removes the hook offset" "$(ls "$DEV_UP_CACHE/$P.hookoff" "$DEV_UP_CACHE/$P.state" 2>/dev/null)" ""
+check "the server-down branch removes the hook offset and the legacy pid file" "$(ls "$DEV_UP_CACHE/$P.hookoff" "$DEV_UP_CACHE/$P.state" "$DEV_UP_CACHE/$P.pid" 2>/dev/null)" ""
+
+systemd-run --user --quiet --unit="dev-up-$P" false
+for _ in $(seq 20); do [ "$(active $P)" = failed ] && break; sleep 0.25; done
+check "serve replaces a failed leftover unit" "$(serve $P -- "exec python3 -m http.server $P" 2>&1)" "STARTED unit=dev-up-$P *"
+"$DU" wait $P >/dev/null; "$DU" stop $P >/dev/null; systemctl --user reset-failed "dev-up-$P" 2>/dev/null
+
+"$DU" state $P init >/dev/null
+printf 'DEV_UP_ENVPORT=%s\n' "$P" >"$T/app/.env"
+# shellcheck disable=SC2016 # the unit's bash expands these, not this shell and not systemd
+serve $P -- 'X=v; echo "x=${X} pid=$$"; set -a; . ./.env; set +a; exec python3 -m http.server ${DEV_UP_ENVPORT}' >/dev/null 2>&1
+check "the port read from .env reaches the server" "$("$DU" wait $P | head -1)" "READY http=200"
+check "bash, not systemd, expands \${VAR} and \$\$" "$(grep '^x=' "$DEV_UP_CACHE/$P.log")" "x=v pid=[0-9]*"
+"$DU" stop $P >/dev/null
+
+echo 30 >"$DEV_UP_CACHE/$P.hookoff"
+serve $P -- "echo 'ReferenceError: x is not defined at boot'; exec python3 -m http.server $P" >/dev/null 2>&1
+"$DU" wait $P >/dev/null
+check "after a restart the hook reads the new log from its start" "$("$DU" unwatched)" "*ReferenceError: x is not defined at boot*"
+mv "$DEV_UP_CACHE/$P.log" "$T/log.bak"
+check "the hook writes nothing to stderr when the log is gone" "$("$DU" unwatched 2>&1 >/dev/null)" ""
+mv "$T/log.bak" "$DEV_UP_CACHE/$P.log"
+"$DU" stop $P >/dev/null
+
+serve $P -- "trap '' TERM; exec python3 -m http.server $P" >/dev/null 2>&1
+"$DU" wait $P >/dev/null
+t0=$(date +%s); out=$("$DU" stop $P); t1=$(date +%s)
+check "stop kills a server that ignores SIGTERM within 15 s" "$out $((t1 - t0 <= 15))" "STOPPED 1"
+"$DU" state $P rm
 
 serve $P -- "echo starting; sleep 1; exit 1" >/dev/null 2>&1
 check "wait reports a death the log never names" "$("$DU" wait $P | head -1)" "DIED"
@@ -119,10 +158,10 @@ serve $P3 --dir "$T/app/.claude/worktrees/wt" --mem 64M -- "python3 -m http.serv
 "$DU" wait $P3 >/dev/null
 check "a nested worktree is not this checkout" "$("$DU" owner $P3)" "*mine=worktree*"
 check "--mem becomes the unit's MemoryMax" "$(systemctl --user show -p MemoryMax --value "dev-up-$P3")" "67108864"
-"$DU" state $P3 init >/dev/null; : >"$DEV_UP_CACHE/$P3.hookoff"
+"$DU" state $P3 init >/dev/null; : >"$DEV_UP_CACHE/$P3.hookoff"; : >"$DEV_UP_CACHE/$P3.pid"
 "$DU" stop $P3 >/dev/null
 "$DU" state $P3 rm
-check "state rm removes the hook offset" "$(ls "$DEV_UP_CACHE/$P3.hookoff" 2>/dev/null)" ""
+check "state rm removes the hook offset and the legacy pid file" "$(ls "$DEV_UP_CACHE/$P3.hookoff" "$DEV_UP_CACHE/$P3.pid" 2>/dev/null)" ""
 
 printf '%s\n' 'DATABASE_URL=postgresql://u:hunter2@localhost:54322/db' 'export NEXTAUTH_URL=http://localhost:3001' 'NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321' >"$T/app/.env"
 out=$("$DU" preflight "$T/app")

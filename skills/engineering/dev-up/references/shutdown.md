@@ -5,10 +5,11 @@ as `SKILL.md` spells it, with the skill's base directory filled in.
 
 1. `S owner PORT` and `S state PORT show`.
 2. `via=dev-up`: `S stop PORT`. `stop` stops the unit `dev-up-PORT` that `serve` started, and
-   systemd sends SIGTERM to every process in it and nothing else. `via=other`: the
-   server was already running before dev-up, so leave it up unless the user names it; then
-   `S stop PORT --force`. `STILL_BOUND` means a supervisor respawns it (a `turbo dev` in a terminal, a process
-   manager): tell the user and leave it.
+   systemd sends SIGTERM to every process in it and nothing else, then SIGKILL after 10 s.
+   `via=other`: the server was already running before dev-up, or a dev-up older than the
+   systemd unit started it, so leave it up unless the user names it; then `S stop PORT --force`.
+   `STILL_BOUND` after `--force` means a supervisor respawns it (a `turbo dev` in a terminal, a
+   process manager) or it ignores SIGTERM: tell the user and leave it.
 3. `TaskStop` the `watcher_task` when `watcher_alive=yes`.
 4. Close the tab with `tabs_close_mcp`, only when the recorded `tab_id` appears in a fresh
    `tabs_context_mcp` list on `localhost:PORT`. A recorded id can point at another URL by now, and

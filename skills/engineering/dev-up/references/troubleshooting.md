@@ -29,7 +29,7 @@ startup misbehaves.
   trust a measurement.
 
 - **An edited `.env`/config doesn't take effect.** A running server won't pick up env changes, and
-  a server you launched in the background inherits the *launching shell's* env — which a version
+  `serve` copies the *launching shell's* env into the unit — which a version
   manager (mise/asdf/direnv) may have seeded at boot with stale values. Source it in the launch
   command (`set -a; . ./.env; set +a; …`) or relaunch from a fresh shell. Don't trust an edit
   alone.
@@ -56,12 +56,16 @@ The watcher prints `SERVER DOWN`, or the hook says the server is down. `journalc
 dev-up-PORT` keeps the unit's exit reason after the unit is gone. Read it before relaunching:
 
 - `oom-kill`, or `Killed` with nothing in the log: the kernel OOM killer, systemd-oomd, or the
-  unit's own `MemoryMax`. Relaunch through Restart with `serve --mem 4G` so the cap applies to the
-  server alone, or raise the cap.
+  unit's own `MemoryMax`. The unit sits in the user manager's `app.slice`, which systemd-oomd
+  watches under memory pressure, and it picks the heaviest unit there, often a large dev server.
+  Relaunch through Restart with `serve --mem 4G` so the cap applies to the server alone, or raise
+  the cap.
 - `SIGTERM` while a subagent was working: a delegate killed it by name. Tell delegates that start
   servers to launch through `serve` and stop with `stop <port>`, never `pkill -f`.
 - Relaunch only through `serve`. `nohup`, `setsid` and `disown` put the server outside the unit,
   so `stop`, `wait` and `owner` no longer see it as this skill's server.
+- `serve` fails with `Unit dev-up-PORT.service was already loaded`: the old unit is still
+  stopping, which takes up to 10 s. Run `stop PORT`, then `serve` again.
 
 ## The browser tab shows a Chrome "error page" / `claude-in-chrome` calls fail
 

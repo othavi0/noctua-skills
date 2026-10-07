@@ -10,8 +10,8 @@
 #                         to PORT.log, and return: STARTED unit=dev-up-PORT log=FILE
 #   wait PORT             READY http=N | HTTP_5XX http=N | DIED | BUSY_OTHER pid=N | BOUND_NO_HTTP | TIMEOUT
 #   watch PORT            the Monitor command: new error lines from the log, minus noise and excludes
-#   stop PORT [--force]   stop the unit serve started, or an orphan listener: STOPPED | STILL_BOUND.
-#                         --force: any listener
+#   stop PORT [--force]   stop the unit serve started (systemd sends SIGKILL after 10 s), or an
+#                         orphan listener: STOPPED | STILL_BOUND. --force: any listener
 #   state PORT init | show | get KEY | set KEY=VALUE... | pause | exclude 'TEXT' | rm
 #   unwatched             for the UserPromptSubmit hook: this session's dead servers, and the errors
 #                         logged since the last prompt when the watcher is gone
@@ -49,7 +49,7 @@ listener_pid() {
 unit() { say "dev-up-$1"; }
 served() { systemctl --user is-active --quiet "$(unit "$1")" 2>/dev/null; }
 in_unit() { [ -n "${1:-}" ] && grep -qE "/$(unit "$2")\.service\$" "/proc/$1/cgroup" 2>/dev/null; }
-orphan() { case "$1" in *' (deleted)') return 0 ;; esac; return 1; }
+orphan() { case "$1" in *' (deleted)') [ ! -d "$1" ]; return ;; esac; return 1; }
 
 tree() {
   ps -eo pid=,ppid= | awk -v root="$1" '
@@ -168,16 +168,21 @@ cmd_serve() {
   served "$port" && die 3 "unit $(unit "$port") is already running; stop $port first"
   cd "$dir" 2>/dev/null || { say "dev-up serve: no such dir $dir" >>"$log"; die 2 "serve: no such dir $dir"; }
   [ -f "$log" ] && mv "$log" "$log.1"
-  local top v; top=$(toplevel "$PWD")
+  rm -f "$(f "$port" hookoff)"
+  local top v c; top=$(toplevel "$PWD")
   PATH="$PWD/node_modules/.bin:$top/node_modules/.bin:$PATH"
   [ -d .venv/bin ] && PATH="$PWD/.venv/bin:$PATH"
   # A service unit starts from the user manager's environment, not this shell's: copy every
-  # exported variable by name, so values never reach the command line.
-  local -a env=() props=()
+  # exported variable by name. Values stay off the command line; systemd keeps them in the
+  # unit's transient file under /run/user, readable only by this user.
+  local -a env=() props=(-p TimeoutStopSec=10)
   for v in $(compgen -e); do env+=(--setenv="$v"); done
-  [ -n "$mem" ] && props=(-p "MemoryMax=$mem")
+  [ -n "$mem" ] && props+=(-p "MemoryMax=$mem")
+  # systemd expands ${VAR} and $$ in ExecStart before bash runs; $$ is its escape for a literal $.
+  c="exec >>$(q "$log") 2>&1; $*"
+  systemctl --user reset-failed "$(unit "$port")" 2>/dev/null
   systemd-run --user --quiet --collect --unit="$(unit "$port")" --working-directory="$PWD" \
-    "${env[@]}" ${props[@]+"${props[@]}"} -- bash -c "exec >>$(q "$log") 2>&1; $*" \
+    "${env[@]}" "${props[@]}" -- bash -c "${c//\$/\$\$}" \
     || die 3 "systemd-run could not start $(unit "$port")"
   say "STARTED unit=$(unit "$port") log=$log"
 }
@@ -299,7 +304,7 @@ cmd_state() {
       say "server_alive=$(served "$port" && echo yes || echo no) watcher_alive=$(alive "$wp" && echo yes || echo no) paused=$([ -f "$(f "$port" paused)" ] && echo yes || echo no)"
       [ -s "$(f "$port" exclude)" ] && sed 's/^/excluded: /' "$(f "$port" exclude)"
       return 0 ;;
-    rm) rm -f "$sf" "$(f "$port" watch)" "$(f "$port" paused)" "$(f "$port" exclude)" "$(f "$port" hookoff)" ;;
+    rm) rm -f "$sf" "$(f "$port" watch)" "$(f "$port" paused)" "$(f "$port" exclude)" "$(f "$port" hookoff)" "$(f "$port" pid)" ;;
     *) die 2 "state: unknown op '$op'" ;;
   esac
 }
@@ -318,11 +323,11 @@ cmd_unwatched() {
     wp=$(cat "$(f "$port" watch)" 2>/dev/null)
     if ! bound "$port"; then
       say "dev-up: the server on port $port is down (log: $(f "$port" log)). Its state is cleared; run /dev-up $port to bring it back."
-      rm -f "$sf" "$(f "$port" watch)" "$(f "$port" paused)" "$(f "$port" hookoff)"
+      rm -f "$sf" "$(f "$port" watch)" "$(f "$port" paused)" "$(f "$port" hookoff)" "$(f "$port" pid)"
       continue
     fi
     log=$(f "$port" log)
-    size=$(wc -c <"$log" 2>/dev/null | tr -d ' '); size=${size:-0}
+    size=0; [ -f "$log" ] && size=$(wc -c <"$log" | tr -d ' ')
     if ! alive "$wp" && [ ! -f "$(f "$port" paused)" ]; then
       off=$(cat "$(f "$port" hookoff)" 2>/dev/null); off=${off:-0}
       [ "$size" -lt "$off" ] && off=0

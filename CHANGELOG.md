@@ -13,6 +13,10 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
   erros do log desde o último prompt. O primeiro `browser_batch` começa com
   `navigate`, e um servidor com cwd apagado (worktree removido) cai sem
   pergunta, com PID e cwd no relatório. Vem da retro de 23/09 a 07/10.
+  Servidores subidos pela versão anterior não estão numa unidade: aparecem
+  como `via=other` e só caem com `stop PORT --force`, com o OK do user. O
+  systemd-oomd ainda pode escolher a unidade sob pressão de memória, porque
+  ela fica no `app.slice`; nesse caso ele mata o cgroup do servidor.
 
 - `dev-up` ganhou `scripts/dev-up.sh`, que faz a parte mecânica: dono da porta
   pela árvore de processos, preflight de worktree, launch, espera pelo pid do
