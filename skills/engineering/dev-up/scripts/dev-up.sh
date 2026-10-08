@@ -2,24 +2,28 @@
 # dev-up: the mechanical half of the dev-up skill. One dev server per port, one log, one state file.
 #
 # Usage: dev-up.sh <command> [PORT] [args]
-#   owner PORT            FREE | BUSY pid=N cwd=DIR mine=yes|worktree|no|? via=dev-up|other state=mine|other|none
+#   owner PORT            FREE | BUSY pid=N cwd=DIR mine=yes|worktree|orphan|no|? via=dev-up|other
+#                         state=mine|other|none. orphan: the listener's cwd was deleted.
 #   preflight [DIR]       what this checkout needs before launch: run/todo/warn lines
 #   serve PORT [--dir DIR] [--mem SIZE] -- CMD
-#                         run CMD (one shell string) in the foreground, logging to PORT.log.
-#                         Call it with run_in_background: the task ends when the server dies.
+#                         start CMD (one shell string) as the systemd user unit dev-up-PORT, logging
+#                         to PORT.log, and return: STARTED unit=dev-up-PORT log=FILE
 #   wait PORT             READY http=N | HTTP_5XX http=N | DIED | BUSY_OTHER pid=N | BOUND_NO_HTTP | TIMEOUT
 #   watch PORT            the Monitor command: new error lines from the log, minus noise and excludes
-#   stop PORT [--force]   SIGTERM the server serve started: STOPPED | STILL_BOUND. --force: any listener
+#   stop PORT [--force]   stop the unit serve started (systemd sends SIGKILL after 10 s), or an
+#                         orphan listener: STOPPED | STILL_BOUND. --force: any listener
 #   state PORT init | show | get KEY | set KEY=VALUE... | pause | exclude 'TEXT' | rm
-#   unwatched             for the UserPromptSubmit hook: this session's dead servers and watchers
+#   unwatched             for the UserPromptSubmit hook: this session's dead servers, and the errors
+#                         logged since the last prompt when the watcher is gone
 #
-# Files in ~/.cache/dev-up: PORT.log, PORT.state (session dir server_task watcher_task tab_id),
-# PORT.pid (serve), PORT.watch (watch), PORT.paused, PORT.exclude (fixed strings, one per line).
+# Files in ~/.cache/dev-up: PORT.log, PORT.state (session dir watcher_task tab_id), PORT.watch
+# (watch), PORT.paused, PORT.exclude (fixed strings, one per line), PORT.hookoff (log offset at
+# the last prompt).
 # Exit codes: 0 ok, 1 negative verdict, 2 usage, 3 refused.
 set -uo pipefail
 
 CACHE="${DEV_UP_CACHE:-$HOME/.cache/dev-up}"
-KEYS="session dir server_task watcher_task tab_id"
+KEYS="session dir watcher_task tab_id"
 ERRORS='[Ee]rror|Exception|Traceback|Failed to compile|unhandled|ECONNREFUSED|EADDRINUSE|panic|FATAL'
 NOISE='NEXT_REDIRECT|PoolError|QueuePool limit|Too many connections|favicon\.ico|SIGTERM|terminated by signal|exit code 143|(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) [^ ]+( HTTP/[0-9.]+"?)? [23][0-9][0-9]([^0-9]|$)'
 
@@ -42,14 +46,10 @@ listener_pid() {
   else lsof -tnP -iTCP:"$1" -sTCP:LISTEN 2>/dev/null | head -1; fi
 }
 
-descends() {
-  local p="$1" root="$2"
-  while [ -n "$p" ] && [ "$p" -gt 1 ]; do
-    [ "$p" = "$root" ] && return 0
-    p=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')
-  done
-  return 1
-}
+unit() { say "dev-up-$1"; }
+served() { systemctl --user is-active --quiet "$(unit "$1")" 2>/dev/null; }
+in_unit() { [ -n "${1:-}" ] && grep -qE "/$(unit "$2")\.service\$" "/proc/$1/cgroup" 2>/dev/null; }
+orphan() { case "$1" in *' (deleted)') [ ! -d "$1" ]; return ;; esac; return 1; }
 
 tree() {
   ps -eo pid=,ppid= | awk -v root="$1" '
@@ -63,7 +63,7 @@ tree() {
 
 toplevel() { git -C "$1" rev-parse --show-toplevel 2>/dev/null || (cd "$1" && pwd -P); }
 common_dir() { git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null; }
-proc_cwd() { readlink -f "/proc/$1/cwd" 2>/dev/null || lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p'; }
+proc_cwd() { readlink "/proc/$1/cwd" 2>/dev/null || lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p'; }
 
 state_get() { sed -n "s/^$2=//p" "$(f "$1" state)" 2>/dev/null | tail -1; }
 state_owner() {
@@ -72,7 +72,7 @@ state_owner() {
   elif [ -n "$s" ] && [ "$s" = "$(session_id)" ]; then say mine
   else say other; fi
 }
-via() { local sp; sp=$(cat "$(f "$2" pid)" 2>/dev/null); alive "$sp" && descends "$1" "$sp" && say dev-up || say other; }
+via() { in_unit "$1" "$2" && say dev-up || say other; }
 
 cmd_owner() {
   local port="$1" pid cwd here mine=no
@@ -82,7 +82,8 @@ cmd_owner() {
   [ -n "$pid" ] || { say "BUSY pid=? cwd=? mine=? via=other state=$(state_owner "$port")"; return 1; }
   cwd=$(proc_cwd "$pid")
   here=$(toplevel "$PWD")
-  if [ -n "$cwd" ] && [ "$(toplevel "$cwd")" = "$here" ]; then mine=yes
+  if orphan "$cwd"; then mine=orphan
+  elif [ -n "$cwd" ] && [ "$(toplevel "$cwd")" = "$here" ]; then mine=yes
   elif [ -n "$cwd" ] && [ -n "$(common_dir "$PWD")" ] && [ "$(common_dir "$cwd")" = "$(common_dir "$PWD")" ]; then mine=worktree
   fi
   say "BUSY pid=$pid cwd=${cwd:-?} mine=$mine via=$(via "$pid" "$port") state=$(state_owner "$port")"
@@ -160,32 +161,43 @@ cmd_serve() {
     esac
   done
   [ $# -gt 0 ] || die 2 "serve: missing the command after --"
+  have systemd-run || die 3 "serve needs a systemd user manager (systemd-run --user)"
   mkdir -p "$CACHE"
   local log; log=$(f "$port" log)
   if bound "$port"; then say "dev-up serve: port $port is already bound; nothing started" >>"$log"; die 3 "port $port is already bound"; fi
+  served "$port" && die 3 "unit $(unit "$port") is already running; stop $port first"
   cd "$dir" 2>/dev/null || { say "dev-up serve: no such dir $dir" >>"$log"; die 2 "serve: no such dir $dir"; }
   [ -f "$log" ] && mv "$log" "$log.1"
-  rm -f "$(f "$port" pid)"
-  local top; top=$(toplevel "$PWD")
+  rm -f "$(f "$port" hookoff)"
+  local top v c; top=$(toplevel "$PWD")
   PATH="$PWD/node_modules/.bin:$top/node_modules/.bin:$PATH"
   [ -d .venv/bin ] && PATH="$PWD/.venv/bin:$PATH"
-  say $$ >"$(f "$port" pid)"
-  if [ -n "$mem" ]; then exec systemd-run --user --scope --quiet -p MemoryMax="$mem" -- bash -c "$*" >>"$log" 2>&1; fi
-  exec bash -c "$*" >>"$log" 2>&1
+  # A service unit starts from the user manager's environment, not this shell's: copy every
+  # exported variable by name. Values stay off the command line; systemd keeps them in the
+  # unit's transient file under /run/user, readable only by this user.
+  local -a env=() props=(-p TimeoutStopSec=10)
+  for v in $(compgen -e); do env+=(--setenv="$v"); done
+  [ -n "$mem" ] && props+=(-p "MemoryMax=$mem")
+  # systemd expands ${VAR} and $$ in ExecStart before bash runs; $$ is its escape for a literal $.
+  c="exec >>$(q "$log") 2>&1; $*"
+  systemctl --user reset-failed "$(unit "$port")" 2>/dev/null
+  systemd-run --user --quiet --collect --unit="$(unit "$port")" --working-directory="$PWD" \
+    "${env[@]}" "${props[@]}" -- bash -c "${c//\$/\$\$}" \
+    || die 3 "systemd-run could not start $(unit "$port")"
+  say "STARTED unit=$(unit "$port") log=$log"
 }
 
 cmd_wait() {
-  local port="$1" log pidf sp lp code end i=0
-  log=$(f "$port" log); pidf=$(f "$port" pid)
+  local port="$1" log lp code end i=0
+  log=$(f "$port" log)
   end=$(($(date +%s) + 240))
   while :; do
-    sp=$(cat "$pidf" 2>/dev/null)
-    if ! alive "$sp"; then
+    if ! served "$port"; then
       i=$((i + 1))
       if [ $i -ge 10 ]; then say DIED; tail -20 "$log" 2>/dev/null; return 1; fi
     elif bound "$port"; then
       lp=$(listener_pid "$port")
-      if [ -n "$lp" ] && ! descends "$lp" "$sp"; then say "BUSY_OTHER pid=$lp"; return 1; fi
+      if [ -n "$lp" ] && ! in_unit "$lp" "$port"; then say "BUSY_OTHER pid=$lp"; return 1; fi
       break
     fi
     [ "$(date +%s)" -lt "$end" ] || { say TIMEOUT; tail -20 "$log" 2>/dev/null; return 1; }
@@ -200,14 +212,13 @@ cmd_wait() {
 }
 
 cmd_watch() {
-  local port="$1" sp exc
+  local port="$1" exc
   mkdir -p "$CACHE"
   say $$ >"$(f "$port" watch)"
   rm -f "$(f "$port" paused)"
   exc=$(f "$port" exclude); [ -f "$exc" ] || : >"$exc"
   : >>"$(f "$port" log)"
-  sp=$(cat "$(f "$port" pid)" 2>/dev/null)
-  if ! alive "$sp" || ! descends "$(listener_pid "$port")" "$sp"; then
+  if ! in_unit "$(listener_pid "$port")" "$port"; then
     say "dev-up: port $port was not started by serve; this watcher reports only the server going down"
   fi
   trap 'pkill -P $$ 2>/dev/null; exit 0' TERM INT HUP
@@ -220,21 +231,24 @@ cmd_watch() {
 }
 
 cmd_stop() {
-  local port="$1" force="${2:-}" sp lp p i
+  local port="$1" force="${2:-}" lp cwd="" p i
   need_tool
-  sp=$(cat "$(f "$port" pid)" 2>/dev/null)
-  bound "$port" || alive "$sp" || { say STOPPED; return 0; }
+  bound "$port" || served "$port" || { say STOPPED; return 0; }
   lp=$(listener_pid "$port")
-  if alive "$sp" && { [ -z "$lp" ] || descends "$lp" "$sp"; }; then
-    for p in $(tree "$sp"); do kill -TERM "$p" 2>/dev/null; done
-  elif [ "$force" = --force ]; then
+  [ -n "$lp" ] && cwd=$(proc_cwd "$lp")
+  if served "$port" && { [ -z "$lp" ] || in_unit "$lp" "$port"; }; then
+    systemctl --user stop "$(unit "$port")" 2>/dev/null
+  elif orphan "$cwd" || [ "$force" = --force ]; then
     [ -n "$lp" ] || die 3 "cannot see the listener's pid (another user's process?)"
     for p in $(tree "$lp"); do kill -TERM "$p" 2>/dev/null; done
   else
     die 3 "port $port is held by pid ${lp:-?}, which serve did not start; ask the user, then use --force"
   fi
   for i in $(seq 20); do
-    if ! bound "$port" && ! alive "$sp"; then rm -f "$(f "$port" pid)"; say STOPPED; return 0; fi
+    if ! bound "$port" && ! served "$port"; then
+      if orphan "$cwd"; then say "STOPPED orphan pid=$lp cwd=$cwd"; else say STOPPED; fi
+      return 0
+    fi
     sleep 0.5
   done
   say "STILL_BOUND (something respawns it or ignores SIGTERM; tell the user)"; return 1
@@ -286,17 +300,17 @@ cmd_state() {
     show)
       [ -f "$sf" ] || { say "no state for $port"; return 1; }
       cat "$sf"
-      local sp wp; sp=$(cat "$(f "$port" pid)" 2>/dev/null); wp=$(cat "$(f "$port" watch)" 2>/dev/null)
-      say "server_alive=$(alive "$sp" && echo yes || echo no) watcher_alive=$(alive "$wp" && echo yes || echo no) paused=$([ -f "$(f "$port" paused)" ] && echo yes || echo no)"
+      local wp; wp=$(cat "$(f "$port" watch)" 2>/dev/null)
+      say "server_alive=$(served "$port" && echo yes || echo no) watcher_alive=$(alive "$wp" && echo yes || echo no) paused=$([ -f "$(f "$port" paused)" ] && echo yes || echo no)"
       [ -s "$(f "$port" exclude)" ] && sed 's/^/excluded: /' "$(f "$port" exclude)"
       return 0 ;;
-    rm) rm -f "$sf" "$(f "$port" pid)" "$(f "$port" watch)" "$(f "$port" paused)" "$(f "$port" exclude)" ;;
+    rm) rm -f "$sf" "$(f "$port" watch)" "$(f "$port" paused)" "$(f "$port" exclude)" "$(f "$port" hookoff)" "$(f "$port" pid)" ;;
     *) die 2 "state: unknown op '$op'" ;;
   esac
 }
 
 cmd_unwatched() {
-  local sid sf port wp
+  local sid sf port wp log exc off size new
   sid=$(session_id)
   if [ -z "$sid" ] && [ ! -t 0 ]; then
     sid=$(sed -nE 's/.*"session_id"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' | head -1)
@@ -309,10 +323,19 @@ cmd_unwatched() {
     wp=$(cat "$(f "$port" watch)" 2>/dev/null)
     if ! bound "$port"; then
       say "dev-up: the server on port $port is down (log: $(f "$port" log)). Its state is cleared; run /dev-up $port to bring it back."
-      rm -f "$sf" "$(f "$port" pid)" "$(f "$port" watch)" "$(f "$port" paused)"
-    elif ! alive "$wp" && [ ! -f "$(f "$port" paused)" ]; then
-      say "dev-up: port $port has no live watcher; re-arm it (dev-up step 3) before answering."
+      rm -f "$sf" "$(f "$port" watch)" "$(f "$port" paused)" "$(f "$port" hookoff)" "$(f "$port" pid)"
+      continue
     fi
+    log=$(f "$port" log)
+    size=0; [ -f "$log" ] && size=$(wc -c <"$log" | tr -d ' ')
+    if ! alive "$wp" && [ ! -f "$(f "$port" paused)" ]; then
+      off=$(cat "$(f "$port" hookoff)" 2>/dev/null); off=${off:-0}
+      [ "$size" -lt "$off" ] && off=0
+      exc=$(f "$port" exclude); [ -f "$exc" ] || : >"$exc"
+      new=$(tail -c +"$((off + 1))" "$log" 2>/dev/null | grep -E "$ERRORS" | grep -vE "$NOISE" | grep -vF -f "$exc" | tail -5)
+      [ -n "$new" ] && { say "dev-up: port $port logged errors since the last prompt:"; say "$new"; }
+    fi
+    say "$size" >"$(f "$port" hookoff)"
   done
   return 0
 }

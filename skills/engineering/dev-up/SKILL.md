@@ -55,6 +55,9 @@ the first line (`FREE`, `READY`, `DIED`, ...). Write the state only through its 
   `via=other` the server writes no log here, and the watcher only reports it going down.
 - `mine=worktree` → another worktree of this repo serves different code. Ask the user: reuse it as
   is, or run Restart from this checkout.
+- `mine=orphan` → the server's working directory was deleted, so it serves a removed worktree.
+  `stop PORT` without asking; it prints `STOPPED orphan pid=N cwd=DIR`. Tell the user that PID and
+  cwd in one line, then `state PORT init` and step 2.
 - `mine=no` or `mine=?` → a foreign process. Leave it alone and ask the user.
 
 ## 2. Start the server
@@ -71,17 +74,18 @@ the first line (`FREE`, `READY`, `DIED`, ...). Write the state only through its 
    with the number swapped and the env prefix kept: `TZ=UTC next dev -p 3001` becomes
    `TZ=UTC next dev -p PORT`. `serve` puts the local `node_modules/.bin` and `.venv/bin` first on
    `PATH`, so the bare binary name resolves. Leave `package.json` as is.
-4. Launch with Bash `run_in_background: true`:
+4. Launch with a foreground Bash call, not `run_in_background`:
 
    ```bash
    bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh serve PORT --dir <app dir> -- '<dev command>'
    ```
 
-   Add `--mem 4G` when this machine has killed a dev server before: it runs the command under
-   `systemd-run --user --scope` with that memory cap. After editing `.env` this session, prefix the
-   command with `set -a; . ./.env; set +a;`. The background task ends when the server dies, and
-   that exit is the death alarm, so launch only through `serve`. Then
-   `state PORT set server_task=<task id>`.
+   `serve` starts the command as the systemd user unit `dev-up-PORT`, with this shell's
+   environment, and returns `STARTED unit=dev-up-PORT log=FILE`. The server lives outside
+   Claude Code's background tasks, so their time limit and low-memory cleanup never reach it. The
+   watcher's `SERVER DOWN` line is the death alarm. `--mem 4G` caps the unit with `MemoryMax`.
+   After editing `.env` this session, prefix the command with `set -a; . ./.env; set +a;`. Launch
+   only through `serve`.
 5. Wait with a foreground Bash call and `timeout: 600000`: `wait PORT`. `READY` → step 3. Any other
    verdict (`DIED`, `HTTP_5XX`, `BUSY_OTHER`, `BOUND_NO_HTTP`, `TIMEOUT`) comes with the log tail:
    read it, then [`references/troubleshooting.md`](references/troubleshooting.md).
@@ -101,9 +105,8 @@ Arm one Monitor: command `bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh watch PORT`
 (task <id>, ...)`: run `state PORT set watcher_task=<id>`. `state PORT show` reports
 `watcher_alive` from the watcher's own process; `TaskList` never lists a Monitor.
 
-- Expiry notice after an event or a user prompt since the last arm → re-arm now. A quiet expiry →
-  let it lapse. On the user's next prompt the skill's hook prints `port PORT has no live watcher`;
-  re-arm before answering.
+- Expiry → let it lapse, with no message. On the user's next prompt the skill's hook prints the
+  error lines the log got since the last prompt. Re-arm only while the user is testing in the tab.
 - A real error → report it.
 - A transient blip (DNS `EAI_AGAIN`, one failed external call, a `DeprecationWarning`) → ignore it.
 - A recurring line that changes nothing the user sees → `state PORT exclude '<literal text from the
@@ -129,10 +132,11 @@ Arm one Monitor: command `bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh watch PORT`
    1. `tabs_context_mcp` with `createIfEmpty: true`. Reuse a tab already at `localhost:PORT`, else
       `tabs_create_mcp`.
    2. `navigate` to `http://localhost:PORT`, the root, so a login redirect shows up first.
-   3. One `browser_batch`: `read_console_messages`, `read_network_requests`, `navigate` to the
-      root, `tabs_context_mcp`. The two reads start the recording, so they come back empty by
-      design: never report them as a smoke result. The last call gives the real URL. A
-      `browser-internal` error means step 2 had not landed: repeat steps 2 and 3.
+   3. One `browser_batch`: `navigate` to the root, `read_console_messages`,
+      `read_network_requests`, `navigate` to the root, `tabs_context_mcp`. The first `navigate`
+      moves a tab still on `chrome://newtab` off the internal URL that makes the reads fail. The
+      two reads start the recording, so they come back empty by design: never report them as a
+      smoke result. The last call gives the real URL.
    4. The URL ended on a login route (`/login`, `/auth`, `/sign-in`, `/entrar`, `/acesso`,
       `/conta`) → stop and ask the user to log in. Credentials are the user's to type, in the tab
       and in curl alike. Continue when they confirm, then navigate to the route you need.
@@ -156,12 +160,12 @@ found, or `hidden`, which means screenshots and clicks stall until the user brin
 For new code, a new `.env`, or another worktree on the same port. Keep the port: the login cookie
 belongs to `host:port`, so a new port logs the user out.
 
-1. `owner PORT`. With `via=dev-up`, `stop PORT`, then `TaskStop` the `server_task` when this
-   session started it. With `via=other`, ask the user first; on a yes, `stop PORT --force`.
+1. `owner PORT`. With `via=dev-up` or `mine=orphan`, `stop PORT`. With `via=other`, ask the user
+   first; on a yes, `stop PORT --force`.
 2. `state PORT init` from the directory you will serve.
 3. Another worktree → `preflight` there first.
 4. Launch and wait as in step 2.4 and 2.5, with `--dir` pointing at the code to serve. `wait`
-   answers `READY` only when the listener descends from this `serve`. Record the new `server_task`.
+   answers `READY` only when the listener runs inside the unit `dev-up-PORT`.
 5. Re-arm the watcher only when `state PORT show` says it is dead. Navigate the tab to the root
    again.
 
