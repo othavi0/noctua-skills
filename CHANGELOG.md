@@ -5,6 +5,18 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `humanize-pt-br` passou a rodar só quando o usuário digita `/humanize-pt-br`
+  (`disable-model-invocation: true`). Das 142 chamadas em 141 sessões, 140
+  vieram do agente, quase sempre antes de `gh pr create`. A skill ganhou
+  `scripts/scan.py`, que acha travessão, meia-risca, seta e contraste de palco
+  fora de código e de aspas, e avisa rótulo em negrito e Title Case, com teste em
+  `evals/scan.test.sh`. O motor de 4 passos e o auto-score saíram (0 de 30
+  sessões fizeram o score). No lugar das regras-mestras entrou a lista das 9
+  marcas que escaparam em PRs. A não-fabricação passou a cobrir vivência,
+  consequência inferida e troca de força. O registro técnico não recebe mais
+  voz. O `evals/trigger-eval.json` saiu, porque a skill não dispara sozinha. Vem
+  da retro de 30 sessões de 27/08 a 25/09.
+
 - `dev-up` sobe o servidor como unidade `dev-up-PORT` do systemd do usuário,
   fora das tasks de background do Claude Code. O limite de tempo e a limpeza
   por pouca memória do Claude Code não derrubam mais o servidor. O `serve`

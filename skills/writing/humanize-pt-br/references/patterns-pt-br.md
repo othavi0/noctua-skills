@@ -1,6 +1,6 @@
 # Marcas de IA em português brasileiro: catálogo de detecção
 
-Catálogo das marcas linguísticas que delatam texto gerado por LLM em PT-BR, com exemplos antes/depois. Carregue este arquivo quando for editar prosa em PT-BR. Ele consome 8-10k tokens.
+Catálogo das marcas linguísticas que delatam texto gerado por LLM em PT-BR, com exemplos antes/depois. O `SKILL.md` diz quando carregar este arquivo. Ele tem 38 mil caracteres.
 
 Fontes: [blader/humanizer](https://github.com/blader/humanizer) (via fork [op7418/Humanizer-zh](https://github.com/op7418/Humanizer-zh)), [hardikpandya/stop-slop](https://github.com/hardikpandya/stop-slop), [Wikipedia:Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing), adaptados a PT-BR e enriquecidos com fontes brasileiras (lista completa no fim).
 
