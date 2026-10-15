@@ -105,8 +105,10 @@ Arm one Monitor: command `bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh watch PORT`
 (task <id>, ...)`: run `state PORT set watcher_task=<id>`. `state PORT show` reports
 `watcher_alive` from the watcher's own process; `TaskList` never lists a Monitor.
 
-- Expiry → let it lapse, with no message. On the user's next prompt the skill's hook prints the
-  error lines the log got since the last prompt. Re-arm only while the user is testing in the tab.
+- Expiry → let it lapse. The expiry still wakes a turn, and that reply never mentions the watcher:
+  it repeats the action that waits on the user, or the last result the user has not seen, and
+  nothing else. On the user's next prompt the skill's hook prints the error lines the log got
+  since the last prompt. Re-arm only while the user is testing in the tab.
 - A real error → report it.
 - A transient blip (DNS `EAI_AGAIN`, one failed external call, a `DeprecationWarning`) → ignore it.
 - A recurring line that changes nothing the user sees → `state PORT exclude '<literal text from the
