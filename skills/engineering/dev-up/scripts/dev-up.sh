@@ -28,6 +28,7 @@ ERRORS='[Ee]rror|Exception|Traceback|Failed to compile|unhandled|ECONNREFUSED|EA
 NOISE='NEXT_REDIRECT|PoolError|QueuePool limit|Too many connections|favicon\.ico|SIGTERM|terminated by signal|exit code 143|(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) [^ ]+( HTTP/[0-9.]+"?)? [23][0-9][0-9]([^0-9]|$)'
 
 say() { printf '%s\n' "$*"; }
+usage() { awk 'NR > 1 && !/^#/ { exit } NR > 1' "$0"; }
 die() { local code="$1"; shift; say "ERROR: $*" >&2; exit "$code"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 need_port() { case "${1:-}" in ''|*[!0-9]*) die 2 "PORT must be a number, got '${1:-}'";; esac; }
@@ -356,6 +357,6 @@ case "$cmd" in
   stop) cmd_stop "$1" "${2:-}" ;;
   state) cmd_state "$@" ;;
   unwatched) cmd_unwatched ;;
-  -h|--help|help|'') sed -n '2,19p' "$0" ;;
-  *) say "dev-up: unknown command '$cmd'"; sed -n '4,15p' "$0"; exit 2 ;;
+  -h|--help|help|'') usage ;;
+  *) say "dev-up: unknown command '$cmd'"; usage; exit 2 ;;
 esac
