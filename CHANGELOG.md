@@ -5,6 +5,16 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `dev-up` ficou mais enxuto: as references caíram de 269 para 165 linhas.
+  `browser-cache.md` e `coexistence.md` saíram, e as regras que valiam entraram
+  no passo 4 do `SKILL.md`. O `navigate` avulso antes do primeiro
+  `browser_batch` saiu, porque o batch já começa com `navigate`. Do
+  `troubleshooting.md` saíram os itens repetidos do `SKILL.md` (porta fixa,
+  login perdido ao trocar de porta, dependência faltando), e as references
+  perderam travessões e negritos. O `dev-up.sh help` cortava o cabeçalho no
+  meio da frase, e um comando desconhecido não listava o `unwatched`. Agora os
+  dois imprimem o cabeçalho inteiro.
+
 - `humanize-pt-br` passou a rodar só quando o usuário digita `/humanize-pt-br`
   (`disable-model-invocation: true`). Das 142 chamadas em 141 sessões, 140
   vieram do agente, quase sempre antes de `gh pr create`. A skill ganhou

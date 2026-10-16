@@ -1,41 +1,35 @@
 # Interacting with and debugging the tab
 
-After [`SKILL.md`](../SKILL.md) hands control back, this is how to drive and debug the app through
-`TARGET_TAB_ID`.
+After [`SKILL.md`](../SKILL.md) hands control back, drive and debug the app through `TARGET_TAB_ID`
+this way.
 
-- **Text > screenshot.** To inspect or click, use `find` or `read_page` (`filter=interactive`) —
-  cheap, and it returns refs. A screenshot (~1.5k tokens, viewport only, no refs) is only for the
-  *visual* (layout, CSS, render). The **first navigation to a route triggers an on-demand compile**
-  (Vite/Turbopack/webpack); while it runs the renderer is busy and `screenshot`/CDP actions time
-  out ("renderer busy"). Wait for the route to settle (or retry once); during the build, prefer
-  text or `javascript_tool` reads. A screenshot or click that times out on a settled route: read
-  `document.visibilityState`. `hidden` means the tab sits behind another one, and the browser
-  throttles it until the user brings it forward; ask them to.
-- **Refs > coordinates.** Click via a `read_page`/`find` ref, never a hardcoded pixel coordinate —
-  coordinates drift after any DOM change (a navigation, a sheet/modal opening, a list re-render, an
-  on-demand compile) and the click lands on nothing, so you loop retrying. **Never click a confirm
-  or destructive dialog button by coordinate** — `find` it for a stable ref first. After a click
-  that mutates the DOM, re-read refs before the next action.
-- **Predictable steps → `browser_batch`.** Chain known actions (`navigate`+`read_page`,
-  `form_input` across several refs, click+type+press) in one call to cut round-trips. It does
-  **not** pass output→input: if the next step needs a ref you only discover now, go the normal way.
-  A batch skips the permission prompt only when **every** action in it is read-only — mixing
-  `navigate` (state-changing) with reads keeps the token saving but forfeits the free pass.
-- **Responsive/breakpoint testing.** Try it here first: call `resize_window`
-  (`width`/`height`/`tabId`), then confirm with `javascript_tool` that `window.innerWidth`/
-  `innerHeight` actually changed — a one-line check, cheap to run. It failed silently under a
-  tiling WM in one measurement (asked for 390px, stayed at 2106 on Hyprland), so verify rather than
-  trust the tool's own success return. When the resize doesn't stick, measure the width inside
-  this tab with a same-origin iframe sized to the target width.
-- **The server is watched; the client is on demand.** The Monitor notifies you on its own — but
-  only from the **server log** (stdout). The **client** side (React, `fetch` 4xx/5xx, a browser
-  exception) lives in the **browser console**, which the shell can't observe → **no automatic
-  alert**. Run `read_console_messages` (`onlyErrors`) / `read_network_requests` on the tab **when**
-  the screen looks broken or an action fails; don't wait for a spontaneous notification.
-- **Scroll, then prove the scroll before the shot.** A screenshot right after a programmatic
-  scroll (`scrollIntoView` via `javascript_tool`) can capture the page back at the top — the
-  scroll and the capture race. Confirm the position first (read `window.scrollY`, or re-`find` the
-  target) before shooting; a real run burned two scroll+screenshot cycles on this.
-- **Storage/cookies.** `javascript_tool` reads `localStorage`/`sessionStorage` and non-HttpOnly
-  cookies directly. A **HttpOnly** session cookie is invisible to JS — reading it would need a
-  CDP/debug port, which abandons this setup, so it's out of reach here.
+- Read text before you take a screenshot. To inspect or click, use `find` or `read_page`
+  (`filter=interactive`), which return refs. A screenshot costs about 1.5k tokens, covers only the
+  viewport and has no refs, so keep it for layout, CSS and render checks.
+- The first navigation to a route starts an on-demand compile (Vite, Turbopack, webpack). While it
+  runs, the renderer is busy and `screenshot` and other CDP actions time out with "renderer busy".
+  Wait for the route to settle or retry once, and read text or `javascript_tool` in the meantime.
+  When a screenshot or click times out on a settled route, read `document.visibilityState`.
+  `hidden` means the tab sits behind another one and the browser throttles it, so ask the user to
+  bring it forward.
+- Click through a ref from `read_page` or `find`, never a pixel coordinate. Coordinates drift after
+  a navigation, a modal, a list re-render or a compile, and the click lands on nothing. A confirm
+  or destructive button always gets a `find` ref first. After a click that changes the DOM, read
+  the refs again.
+- Chain predictable steps in one `browser_batch`: `navigate` and `read_page`, `form_input` across
+  several refs, or click, type and press. A batch does not pass one action's output to the next,
+  so a step that needs a ref you have not seen yet goes in its own call. A batch skips the
+  permission prompt only when every action in it is read-only, and `navigate` is not.
+- For a breakpoint, call `resize_window` and then check `window.innerWidth` and `innerHeight` with
+  `javascript_tool`. On Hyprland a request for 390px left the window at 2106px while the tool
+  reported success. When the resize does not stick, measure the width with a same-origin iframe of
+  the target width inside this tab.
+- The Monitor watches the server log only. Client errors (React, a `fetch` 4xx or 5xx, a browser
+  exception) stay in the browser console, and nothing notifies you about them. Run
+  `read_console_messages` with `onlyErrors` and `read_network_requests` when the screen looks
+  broken or an action fails.
+- A screenshot right after a programmatic scroll (`scrollIntoView` through `javascript_tool`) can
+  capture the page still at the top. Read `window.scrollY` or `find` the target again before you
+  take it.
+- `javascript_tool` reads `localStorage`, `sessionStorage` and cookies without the HttpOnly flag.
+  An HttpOnly session cookie needs a CDP debug port, which this setup does not have.
