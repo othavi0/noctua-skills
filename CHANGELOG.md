@@ -13,7 +13,11 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
   login perdido ao trocar de porta, dependência faltando), e as references
   perderam travessões e negritos. O `dev-up.sh help` cortava o cabeçalho no
   meio da frase, e um comando desconhecido não listava o `unwatched`. Agora os
-  dois imprimem o cabeçalho inteiro.
+  dois imprimem o cabeçalho inteiro. A aba ganhou o prefixo `[PORTA]` no
+  título, aplicado depois de cada `navigate` por um `MutationObserver` que o
+  repõe quando o app troca o título numa rota SPA. Nenhuma tool renomeia o
+  grupo: a extensão só usa o `displayName` do `session_scope`, que o CLI não
+  manda. Um reload completo tira o prefixo até o próximo `navigate`.
 
 - `humanize-pt-br` passou a rodar só quando o usuário digita `/humanize-pt-br`
   (`disable-model-invocation: true`). Das 142 chamadas em 141 sessões, 140

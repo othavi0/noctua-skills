@@ -133,7 +133,8 @@ Arm one Monitor: command `bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh watch PORT`
    1. `tabs_context_mcp` with `createIfEmpty: true`. Reuse a tab already at `localhost:PORT`, else
       `tabs_create_mcp`.
    2. One `browser_batch`: `navigate` to `http://localhost:PORT`, `read_console_messages`,
-      `read_network_requests`, `navigate` to the root again, `tabs_context_mcp`. The first
+      `read_network_requests`, `navigate` to the root again, the title call below,
+      `tabs_context_mcp`. The first
       `navigate` takes a new tab off `chrome://newtab`, where the reads fail. The two reads start
       the recording before the second `navigate` reloads the page, so never report them as a
       smoke result. The last call gives the real URL, after any login redirect.
@@ -150,6 +151,26 @@ Arm one Monitor: command `bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh watch PORT`
       root and set `tab_id` again.
 
 Confirm a URL with `tabs_context_mcp`, never with a screenshot.
+
+### Port in the tab title
+
+No tool renames the tab group, so the tab title carries the port. Follow every `navigate` on
+`TARGET_TAB_ID` with this `javascript_tool` call in the same `browser_batch`, with `PORT` filled in:
+
+```js
+(() => {
+  const p = '[PORT] ';
+  const fix = () => { if (!document.title.startsWith(p)) document.title = p + document.title.replace(/^\[\d+\] /, ''); };
+  window.__devUpTitle?.disconnect();
+  window.__devUpTitle = new MutationObserver(fix);
+  window.__devUpTitle.observe(document.head ?? document.documentElement, {childList: true, subtree: true, characterData: true});
+  fix();
+  return document.title;
+})()
+```
+
+The observer puts the prefix back when the app sets its own title on a route change. A full
+reload, from HMR or the browser, drops it until the next `navigate`.
 
 ## 5. Hand back
 
@@ -169,7 +190,7 @@ belongs to `host:port`, so a new port logs the user out.
 4. Launch and wait as in step 2.4 and 2.5, with `--dir` pointing at the code to serve. `wait`
    answers `READY` only when the listener runs inside the unit `dev-up-PORT`.
 5. Re-arm the watcher only when `state PORT show` says it is dead. Navigate the tab to the root
-   again.
+   again, with the title call.
 
 ## After setup
 
