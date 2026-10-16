@@ -37,7 +37,7 @@ the first line (`FREE`, `READY`, `DIED`, ...). Write the state only through its 
 ## Invocation
 
 - `/dev-up PORT`: the full flow below.
-- The argument is a URL: open a tab on it (steps 4.1 to 4.2.5 with that URL). No server, watcher
+- The argument is a URL: open a tab on it (steps 4.1 to 4.2.4 with that URL). No server, watcher
   or state.
 - No argument: a `.state` of this checkout with a live port → use that port and say so in one line.
   No `dev` script in the folder → say there is nothing to run. Otherwise ask for the port.
@@ -80,12 +80,10 @@ the first line (`FREE`, `READY`, `DIED`, ...). Write the state only through its 
    bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh serve PORT --dir <app dir> -- '<dev command>'
    ```
 
-   `serve` starts the command as the systemd user unit `dev-up-PORT`, with this shell's
-   environment, and returns `STARTED unit=dev-up-PORT log=FILE`. The server lives outside
-   Claude Code's background tasks, so their time limit and low-memory cleanup never reach it. The
-   watcher's `SERVER DOWN` line is the death alarm. `--mem 4G` caps the unit with `MemoryMax`.
-   After editing `.env` this session, prefix the command with `set -a; . ./.env; set +a;`. Launch
-   only through `serve`.
+   `serve` starts the command as the systemd user unit `dev-up-PORT` with this shell's
+   environment and returns `STARTED unit=dev-up-PORT log=FILE`. Claude Code's background-task
+   time limit and memory cleanup do not reach a unit. `--mem 4G` sets the unit's `MemoryMax`.
+   After editing `.env` this session, prefix the command with `set -a; . ./.env; set +a;`.
 5. Wait with a foreground Bash call and `timeout: 600000`: `wait PORT`. `READY` → step 3. Any other
    verdict (`DIED`, `HTTP_5XX`, `BUSY_OTHER`, `BOUND_NO_HTTP`, `TIMEOUT`) comes with the log tail:
    read it, then [`references/troubleshooting.md`](references/troubleshooting.md).
@@ -126,30 +124,53 @@ Arm one Monitor: command `bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh watch PORT`
      then list again. The call errors → [`references/setup.md`](references/setup.md).
    - One local → use it.
    - Several local → read `${XDG_CONFIG_HOME:-$HOME/.config}/dev-up/browser` before any question.
-     It holds `deviceId=` and `name=` lines. A device matching either one is the hit:
-     `select_browser` with its current deviceId, or go straight on when it is already `inUse`.
-     Miss → `AskUserQuestion` with the local devices, then write both lines for the pick.
-     Details in [`references/browser-cache.md`](references/browser-cache.md).
+     It holds `deviceId=` and `name=` lines. Either one can change between sessions, so a device
+     matching either line is the hit: `select_browser` with its current deviceId, or go straight
+     on when it is already `inUse`. A hit answers the question the list output tells you to ask.
+     Miss → `AskUserQuestion` with the local devices, then write both lines for the pick. Copy the
+     `deviceId` from a fresh `list_connected_browsers`, since `switch_browser` returns none.
 2. Tab. Every call here waits for the previous one to return, on the same tab:
    1. `tabs_context_mcp` with `createIfEmpty: true`. Reuse a tab already at `localhost:PORT`, else
       `tabs_create_mcp`.
-   2. `navigate` to `http://localhost:PORT`, the root, so a login redirect shows up first.
-   3. One `browser_batch`: `navigate` to the root, `read_console_messages`,
-      `read_network_requests`, `navigate` to the root, `tabs_context_mcp`. The first `navigate`
-      moves a tab still on `chrome://newtab` off the internal URL that makes the reads fail. The
-      two reads start the recording, so they come back empty by design: never report them as a
-      smoke result. The last call gives the real URL.
-   4. The URL ended on a login route (`/login`, `/auth`, `/sign-in`, `/entrar`, `/acesso`,
+   2. One `browser_batch`: `navigate` to `http://localhost:PORT`, `read_console_messages`,
+      `read_network_requests`, `navigate` to the root again, the title call below,
+      `tabs_context_mcp`. The first
+      `navigate` takes a new tab off `chrome://newtab`, where the reads fail. The two reads start
+      the recording before the second `navigate` reloads the page, so never report them as a
+      smoke result. The last call gives the real URL, after any login redirect.
+   3. The URL ended on a login route (`/login`, `/auth`, `/sign-in`, `/entrar`, `/acesso`,
       `/conta`) → stop and ask the user to log in. Credentials are the user's to type, in the tab
       and in curl alike. Continue when they confirm, then navigate to the route you need.
-   5. Smoke, one `browser_batch`: `read_console_messages` (`onlyErrors: true`,
+   4. Smoke, one `browser_batch`: `read_console_messages` (`onlyErrors: true`,
       `pattern: "error|failed|exception"`), `read_network_requests` (`urlPattern: "/api"` or the
       app's data origin), and `javascript_tool` with `document.visibilityState`.
-   6. `state PORT set tab_id=<id>`. This is `TARGET_TAB_ID`, the one tab you own. It stays on
-      `localhost:PORT`; another server or a prototype gets its own tab
-      ([`references/coexistence.md`](references/coexistence.md)).
+   5. `state PORT set tab_id=<id>`. This is `TARGET_TAB_ID`, the only tab you act on, and it stays
+      on `localhost:PORT`. Another server or a prototype gets a new tab, created before you close
+      an older one. Leave `localhost` tabs on other ports and the tab group itself alone. When
+      `tabs_context_mcp` stops listing `TARGET_TAB_ID`, the group was recreated: open a tab at the
+      root and set `tab_id` again.
 
 Confirm a URL with `tabs_context_mcp`, never with a screenshot.
+
+### Port in the tab title
+
+No tool renames the tab group, so the tab title carries the port. Follow every `navigate` on
+`TARGET_TAB_ID` with this `javascript_tool` call in the same `browser_batch`, with `PORT` filled in:
+
+```js
+(() => {
+  const p = '[PORT] ';
+  const fix = () => { if (!document.title.startsWith(p)) document.title = p + document.title.replace(/^\[\d+\] /, ''); };
+  window.__devUpTitle?.disconnect();
+  window.__devUpTitle = new MutationObserver(fix);
+  window.__devUpTitle.observe(document.head ?? document.documentElement, {childList: true, subtree: true, characterData: true});
+  fix();
+  return document.title;
+})()
+```
+
+The observer puts the prefix back when the app sets its own title on a route change. A full
+reload, from HMR or the browser, drops it until the next `navigate`.
 
 ## 5. Hand back
 
@@ -169,7 +190,7 @@ belongs to `host:port`, so a new port logs the user out.
 4. Launch and wait as in step 2.4 and 2.5, with `--dir` pointing at the code to serve. `wait`
    answers `READY` only when the listener runs inside the unit `dev-up-PORT`.
 5. Re-arm the watcher only when `state PORT show` says it is dead. Navigate the tab to the root
-   again.
+   again, with the title call.
 
 ## After setup
 

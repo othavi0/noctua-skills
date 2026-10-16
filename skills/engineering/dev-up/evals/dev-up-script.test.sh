@@ -175,6 +175,8 @@ CLAUDE_CODE_SESSION_ID=session-h "$DU" state $P init >/dev/null
 hook=$(sed -n "s/^ *command: '\(.*\)'$/\1/p" "$HERE/SKILL.md")
 check "the hook reaches the script through the cache pointer" "$(printf '{"session_id":"session-h"}' | bash -c "$hook")" "*server on port $P is down*"
 check "the hook is silent for other sessions" "$(printf '{"session_id":"session-x"}' | bash -c "$hook")" ""
+check "help prints the whole header" "$("$DU" help | tail -1)" "# Exit codes: *"
+check "an unknown command lists every command" "$("$DU" bogus | grep -c 'unwatched')" "1"
 
 if command -v docker >/dev/null && docker image inspect bash:3.2 >/dev/null 2>&1; then
   out=$(docker run --rm -v "$HERE/scripts:/s:ro" -e CLAUDE_CODE_SESSION_ID=s bash:3.2 bash -c \
