@@ -36,6 +36,8 @@ check "the server runs as a systemd user unit" "$(active $P)" "active"
 check "wait on a healthy server" "$("$DU" wait $P | head -1)" "READY http=200"
 check "the unit gets the caller's PATH, env and node_modules/.bin" "$(grep -E 'ok$|^probe=' "$DEV_UP_CACHE/$P.log" | tr '\n' ' ')" "caller-path-ok local-bin-ok probe=probe-xyz "
 check "owner names the listener pid and who started it" "$("$DU" owner $P)" "BUSY pid=$(pgrep -f "http.server $P" | head -1) cwd=$T/app mine=yes via=dev-up state=mine"
+check "owner exits 0 when this checkout serves the port" "$("$DU" owner $P >/dev/null; echo "exit=$?")" "exit=0"
+check "preflight names the port this directory already serves" "$("$DU" preflight "$T/app")" "*warn served: this directory already serves port $P (pid *)*"
 check "state show sees the unit" "$("$DU" state $P show | grep -o 'server_alive=[a-z]*')" "server_alive=yes"
 "$DU" state $P set watcher_task=b123 tab_id=77
 check "init keeps this session's state" "$("$DU" state $P init | head -1)" "kept:*"
@@ -91,6 +93,7 @@ mkdir "$T/live (deleted)"
 (cd "$T/live (deleted)" && exec python3 -m http.server $P2 >/dev/null 2>&1) &
 for _ in $(seq 20); do ss -ltnH "sport = :$P2" | grep -q . && break; sleep 0.25; done
 check "a live dir named '* (deleted)' is not an orphan" "$("$DU" owner $P2)" "*mine=no*"
+check "owner exits 1 for a foreign listener" "$("$DU" owner $P2 >/dev/null; echo "exit=$?")" "exit=1"
 check "and stop still asks before killing it" "$("$DU" stop $P2 2>&1; echo "exit=$?")" "*exit=3"
 "$DU" stop $P2 --force >/dev/null
 

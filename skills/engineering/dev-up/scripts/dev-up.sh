@@ -3,8 +3,10 @@
 #
 # Usage: dev-up.sh <command> [PORT] [args]
 #   owner PORT            FREE | BUSY pid=N cwd=DIR mine=yes|worktree|orphan|no|? via=dev-up|other
-#                         state=mine|other|none. orphan: the listener's cwd was deleted.
-#   preflight [DIR]       what this checkout needs before launch: run/todo/warn lines
+#                         state=mine|other|none. orphan: the listener's cwd was deleted. Exits 0 on
+#                         FREE and on mine=yes, 1 otherwise.
+#   preflight [DIR]       what this checkout needs before launch: run/todo/warn lines. warn served:
+#                         a listener already runs from DIR
 #   serve PORT [--dir DIR] [--mem SIZE] -- CMD
 #                         start CMD (one shell string) as the systemd user unit dev-up-PORT, logging
 #                         to PORT.log, and return: STARTED unit=dev-up-PORT log=FILE
@@ -40,6 +42,11 @@ session_id() { say "${CLAUDE_CODE_SESSION_ID:-}"; }
 bound() {
   if have ss; then [ -n "$(ss -ltnH "sport = :$1" 2>/dev/null)" ]
   else lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; fi
+}
+
+listeners() {
+  if have ss; then ss -ltnpH 2>/dev/null | awk '{ n = split($4, a, ":"); if (match($0, /pid=[0-9]+/)) print a[n], substr($0, RSTART + 4, RLENGTH - 4) }'
+  else lsof -nP -iTCP -sTCP:LISTEN -Fpn 2>/dev/null | awk '/^p/ { pid = substr($0, 2) } /^n/ { n = split($0, a, ":"); print a[n], pid }'; fi | sort -un
 }
 
 listener_pid() {
@@ -88,7 +95,7 @@ cmd_owner() {
   elif [ -n "$cwd" ] && [ -n "$(common_dir "$PWD")" ] && [ "$(common_dir "$cwd")" = "$(common_dir "$PWD")" ]; then mine=worktree
   fi
   say "BUSY pid=$pid cwd=${cwd:-?} mine=$mine via=$(via "$pid" "$port") state=$(state_owner "$port")"
-  return 1
+  [ "$mine" = yes ]
 }
 
 q() { printf '%q' "$1"; }
@@ -100,6 +107,10 @@ cmd_preflight() {
   main=$(git -C "$dir" worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')
   [ -n "$main" ] && [ "$main" != "$top" ] && wt=yes
   say "ok checkout $top worktree=$wt"
+  local lport lpid
+  while read -r lport lpid; do
+    [ "$(proc_cwd "$lpid")" = "$dir" ] && say "warn served: this directory already serves port $lport (pid $lpid)"
+  done < <(listeners)
 
   local d l
   for d in "$dir" "$top"; do
