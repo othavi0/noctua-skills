@@ -5,6 +5,15 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `dev-up` decide a porta sem perguntar. Processo alheio na porta pedida fica
+  como está: a skill sobe na próxima porta livre e diz numa linha quem ocupa a
+  pedida. No `Restart` com `via=other`, mesma regra, sem `stop --force`. O
+  `preflight` ganhou a linha `warn served` quando a pasta já serve outra porta,
+  e a skill passa a usar esse servidor, porque o Next 16 aceita um `next dev`
+  por pasta. `owner` sai 0 com `mine=yes`, como já saía com `FREE`. Na
+  auditoria de 21 de outubro foram 7 perguntas de porta e 2 servidores de outra
+  sessão derrubados.
+
 - `dev-up` ficou mais enxuto: as references caíram de 269 para 165 linhas.
   `browser-cache.md` e `coexistence.md` saíram, e as regras que valiam entraram
   no passo 4 do `SKILL.md`. O `navigate` avulso antes do primeiro

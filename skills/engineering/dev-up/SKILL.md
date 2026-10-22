@@ -58,13 +58,18 @@ the first line (`FREE`, `READY`, `DIED`, ...). Write the state only through its 
 - `mine=orphan` → the server's working directory was deleted, so it serves a removed worktree.
   `stop PORT` without asking; it prints `STOPPED orphan pid=N cwd=DIR`. Tell the user that PID and
   cwd in one line, then `state PORT init` and step 2.
-- `mine=no` or `mine=?` → a foreign process. Leave it alone and ask the user.
+- `mine=no` or `mine=?` → a foreign process. Leave it as it is, with no question: run step 1 again
+  on the next port up until `owner` prints `FREE`, serve this checkout there, and tell the user in
+  one line which process (pid, cwd) holds the port they asked for.
 
 ## 2. Start the server
 
 1. `preflight` in the app's directory. Run every `run` line it prints; a `todo` line needs a
    decision. A `warn pinned port` line means an auth callback or CORS origin expects another port:
-   warn in one line and keep the user's port.
+   warn in one line and keep the user's port. A `warn served` line means this directory already
+   runs a dev server on another port, and Next 16 starts one `next dev` per folder: use the server
+   that runs, with no question. `state PORT rm`, say the real port in one line, and go back to
+   step 1 with it.
 2. Find the dev command in the manifest. In a monorepo (`workspaces`, `turbo.json`,
    `pnpm-workspace.yaml`, `nx.json`) the root `dev` starts every app: list the workspaces with a
    `dev` script, ask with `AskUserQuestion` when there is more than one, and launch from that app's
@@ -183,8 +188,9 @@ found, or `hidden`, which means screenshots and clicks stall until the user brin
 For new code, a new `.env`, or another worktree on the same port. Keep the port: the login cookie
 belongs to `host:port`, so a new port logs the user out.
 
-1. `owner PORT`. With `via=dev-up` or `mine=orphan`, `stop PORT`. With `via=other`, ask the user
-   first; on a yes, `stop PORT --force`.
+1. `owner PORT`. With `via=dev-up` or `mine=orphan`, `stop PORT`. With `via=other`, leave it
+   running: serve on the next port `owner` calls `FREE` and tell the user the real port. When that
+   listener runs from this same directory, use it instead, as in step 2.1.
 2. `state PORT init` from the directory you will serve.
 3. Another worktree → `preflight` there first.
 4. Launch and wait as in step 2.4 and 2.5, with `--dir` pointing at the code to serve. `wait`
