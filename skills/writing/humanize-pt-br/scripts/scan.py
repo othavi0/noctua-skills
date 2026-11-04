@@ -66,6 +66,6 @@ def main(caminhos):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
         sys.exit(__doc__)
     sys.exit(main(sys.argv[1:]))
