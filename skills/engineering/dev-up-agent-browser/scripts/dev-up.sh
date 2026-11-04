@@ -398,6 +398,9 @@ ab_env() {
   export AGENT_BROWSER_SESSION; AGENT_BROWSER_SESSION=$(ab_session "$port")
   export AGENT_BROWSER_PROFILE="$STATE_DIR/profiles/$port-$mode"
   export AGENT_BROWSER_ARGS="--class=agent-browser"
+  # The outdated-Chrome check fetches Google's release blog on every launch and prints a CVE
+  # warning on every call; the session only ever opens localhost.
+  export AGENT_BROWSER_NO_VERSION_CHECK=1
   local exe
   if [ "$mode" = headed ]; then export AGENT_BROWSER_HEADED=1; exe=$(headed_exe)
   else unset AGENT_BROWSER_HEADED; exe=$(headless_exe); fi
