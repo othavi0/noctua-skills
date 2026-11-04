@@ -5,6 +5,18 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `dev-up-agent-browser`, skill nova: o `dev-up` com uma sessão do
+  agent-browser por porta no lugar da aba do Claude in Chrome. Headless roda o
+  `chrome-headless-shell` do Playwright, com 176 MB por sessão contra 350 MB do
+  Brave e 7 a 10 ms por clique, medidos em 4 de novembro numa máquina de 16 GB.
+  O script ganhou `ab` (toda chamada com as mesmas opções de launch, porque o
+  agent-browser relança o browser quando duas chamadas divergem), `show` e
+  `hide` (janela visível e volta, levando cookies e storage por `state save` e
+  `state load`), `dash` (dashboard ao vivo) e `browser`. A janela leva a classe
+  `agent-browser`; no Hyprland, uma regra com `no_initial_focus` e
+  `focus_on_activate = false` manteve o foco parado em 174 amostras durante 20
+  ações. O `dev-up` não muda.
+
 - `dev-up` decide a porta sem perguntar. Processo alheio na porta pedida fica
   como está: a skill sobe na próxima porta livre e diz numa linha quem ocupa a
   pedida. No `Restart` com `via=other`, mesma regra, sem `stop --force`. O

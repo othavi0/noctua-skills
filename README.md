@@ -2,7 +2,7 @@
 
 [![skills.sh](https://skills.sh/b/othavi0/noctua-skills)](https://skills.sh/othavi0/noctua-skills)
 
-Four Claude Code skills I use every day, packaged to drop into any project. Each
+Five Claude Code skills I use every day, packaged to drop into any project. Each
 one started as a bug I hit twice, and gets cut the moment it stops earning its
 place.
 
@@ -24,7 +24,7 @@ Claude Code.
 Prefer to install by hand? Clone the repo and copy a skill folder into
 `~/.claude/skills` (global) or `.claude/skills` (one project).
 
-`dev-up` and `claude-md-prune` are model-invoked. Type them as a slash command
+`dev-up`, `dev-up-agent-browser` and `claude-md-prune` are model-invoked. Type them as a slash command
 (`/dev-up 3000`) or let Claude reach for them when the task fits the description.
 `mobile-up` and `humanize-pt-br` run only when you type them.
 
@@ -40,6 +40,20 @@ anything else already running. In a fresh git worktree it checks for missing
 costs a full turn. Needs the
 [claude-in-chrome](https://code.claude.com/docs/en/chrome) browser connection,
 and walks through that one-time setup itself on first run.
+
+**[dev-up-agent-browser](./skills/engineering/dev-up-agent-browser/SKILL.md)**
+is `dev-up` for agents that test on their own. Claude in Chrome drives one real
+browser for everyone, at 0.5 to 1 s per action, so three agents testing three
+apps fight over the same window and eat the RAM of a full browser each. This
+skill keeps the server, the watcher and the port-as-key from `dev-up` and swaps
+the tab for an [agent-browser](https://agent-browser.dev) session per port:
+headless `chrome-headless-shell` at about 176 MB and 7 to 10 ms per click,
+measured on a 16 GB machine. `dash` streams every session live in one page,
+`show` turns a session into a real window with the login carried over, and
+`hide` sends it back. Every call goes through one wrapper, because agent-browser
+relaunches the browser whenever two calls disagree on their launch options, and
+the window that comes back steals your focus. On Hyprland, one window rule
+keeps the visible window from ever pulling you to its workspace.
 
 **[mobile-up](./skills/engineering/mobile-up/SKILL.md)** exists because an Expo
 app needs three things up at once and each one lies in its own way. The dev

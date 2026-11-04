@@ -1,0 +1,18 @@
+[
+  {"query": "/dev-up-agent-browser 3000", "should_trigger": true},
+  {"query": "start the dev server on 5173 and test it with agent-browser", "should_trigger": true},
+  {"query": "sobe o app na porta 8080 e testa com o agent-browser, sem abrir aba no meu Brave", "should_trigger": true},
+  {"query": "I want three agents testing three local apps at the same time without eating my RAM", "should_trigger": true},
+  {"query": "run this project on port 4000 headless and check the console for errors", "should_trigger": true},
+  {"query": "roda o dev server na 3001 e me deixa ver a sessão do agente no dashboard", "should_trigger": true},
+  {"query": "serve the app on 9000 and click through the signup flow with agent-browser", "should_trigger": true},
+  {"query": "sobe o servidor e abre uma janela visível do agent-browser para eu logar", "should_trigger": true},
+  {"query": "/dev-up 3000", "should_trigger": false},
+  {"query": "open the app in my Chrome tab with Claude in Chrome on port 5000", "should_trigger": false},
+  {"query": "sobe o app Expo no emulador Android, preciso testar no celular", "should_trigger": false},
+  {"query": "scrape the product prices from this public website", "should_trigger": false},
+  {"query": "who is holding port 8081", "should_trigger": false},
+  {"query": "explain how to configure Vite to bind on a custom port", "should_trigger": false},
+  {"query": "run our unit test suite and tell me which tests fail", "should_trigger": false},
+  {"query": "install agent-browser globally", "should_trigger": false}
+]
