@@ -35,8 +35,9 @@ the server as this skill's.
 - A page on `about:blank`, or a window that takes focus without the class `agent-browser`: a call
   went to `agent-browser` directly and the daemon relaunched the browser. `S ab PORT close`, then
   `S ab PORT open http://localhost:PORT/`.
-- `S browser PORT` says `alive=no` after a pause: the daemon stops after 30 minutes idle. The next
-  `S ab PORT open ...` starts it with the same profile, so the login stays.
+- `dev-up: the session on port PORT had closed; reopened it at ...` on stderr: the daemon stopped
+  after 30 minutes idle, and `ab` reopened the session at the root with the same profile, so the
+  login stays. Navigate back to the route you were on before acting.
 - `Cannot use storage_state with profile`: `--state` went together with a profile. Open first,
   then `S ab PORT state load <file>`, then open again; `show` and `hide` do exactly that.
 - `S browser PORT` shows a full browser where `chrome-headless-shell` used to run: a cache cleaner

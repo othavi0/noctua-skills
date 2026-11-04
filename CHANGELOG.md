@@ -5,6 +5,18 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `dev-up` e `dev-up-agent-browser`: o watcher avisa cada queda do servidor.
+  Antes, o laço de queda avisava `SERVER DOWN` uma vez e terminava, e o tail
+  seguia vivo. Como o Restart só re-arma um watcher morto, uma segunda queda
+  depois do Restart passava calada até o próximo prompt. Achado num statechart
+  do fluxo e reproduzido no script.
+- `dev-up-agent-browser`: um comando `ab` numa sessão que fechou por
+  inatividade reabria o browser em `about:blank` e falhava com `Element not
+  found`. Agora o `ab` reabre a sessão na raiz do app e avisa no stderr. O
+  `show` e o `hide` perdiam o login feito numa janela que fechou por
+  inatividade antes da troca. Agora eles leem o perfil da sessão fechada sem
+  abrir janela (`DEV_UP_AB_NOWINDOW=1`) e levam o login para o outro modo.
+
 - `dev-up-agent-browser`, skill nova: o `dev-up` com uma sessão do
   agent-browser por porta no lugar da aba do Claude in Chrome. Headless roda o
   `chrome-headless-shell` do Playwright, com 176 MB por sessão contra 350 MB do

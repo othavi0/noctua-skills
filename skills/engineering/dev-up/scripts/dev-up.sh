@@ -234,7 +234,12 @@ cmd_watch() {
     say "dev-up: port $port was not started by serve; this watcher reports only the server going down"
   fi
   trap 'pkill -P $$ 2>/dev/null; exit 0' TERM INT HUP
-  ( while bound "$port"; do sleep 5; done; say "dev-up: SERVER DOWN on port $port" ) &
+  # One report per fall: after a restart binds the port again, the probe watches for the next one.
+  # It polls, so a fall within about 1 s of the restart reads as the same fall.
+  ( while :; do
+      while bound "$port"; do sleep 5; done; say "dev-up: SERVER DOWN on port $port"
+      until bound "$port"; do sleep 1; done
+    done ) &
   tail -n 0 -F "$(f "$port" log)" 2>/dev/null \
     | grep -E --line-buffered "$ERRORS" \
     | grep -vE --line-buffered "$NOISE" \

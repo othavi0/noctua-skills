@@ -247,7 +247,12 @@ cmd_watch() {
     say "dev-up: port $port was not started by serve; this watcher reports only the server going down"
   fi
   trap 'pkill -P $$ 2>/dev/null; exit 0' TERM INT HUP
-  ( while bound "$port"; do sleep 5; done; say "dev-up: SERVER DOWN on port $port" ) &
+  # One report per fall: after a restart binds the port again, the probe watches for the next one.
+  # It polls, so a fall within about 1 s of the restart reads as the same fall.
+  ( while :; do
+      while bound "$port"; do sleep 5; done; say "dev-up: SERVER DOWN on port $port"
+      until bound "$port"; do sleep 1; done
+    done ) &
   tail -n 0 -F "$(f "$port" log)" 2>/dev/null \
     | grep -E --line-buffered "$ERRORS" \
     | grep -vE --line-buffered "$NOISE" \
@@ -396,12 +401,22 @@ ab_env() {
   local exe
   if [ "$mode" = headed ]; then export AGENT_BROWSER_HEADED=1; exe=$(headed_exe)
   else unset AGENT_BROWSER_HEADED; exe=$(headless_exe); fi
+  # DEV_UP_AB_NOWINDOW=1 keeps the mode's browser and profile but shows no window.
+  [ "${DEV_UP_AB_NOWINDOW:-}" = 1 ] && unset AGENT_BROWSER_HEADED
   if [ -n "$exe" ]; then export AGENT_BROWSER_EXECUTABLE_PATH="$exe"; else unset AGENT_BROWSER_EXECUTABLE_PATH; fi
 }
 cmd_ab() {
   local port="$1"; shift
   have agent-browser || die 3 "agent-browser is not on PATH"
   [ $# -gt 0 ] || die 2 "ab PORT <agent-browser command...>"
+  # A dead daemon (idle timeout, a crash) would come back on about:blank for any command but open.
+  case "$1" in
+    open|goto|navigate|close|quit|exit|session|state|skills|dashboard|install|--*) ;;
+    *) if ! ab_alive "$port"; then
+         say "dev-up: the session on port $port had closed; reopened it at http://localhost:$port/" >&2
+         ( ab_env "$port"; agent-browser --idle-timeout 30m open "http://localhost:$port/" >/dev/null 2>&1 )
+       fi ;;
+  esac
   ( ab_env "$port"; exec agent-browser --idle-timeout 30m "$@" )
 }
 cmd_switch() {
@@ -412,6 +427,13 @@ cmd_switch() {
     url=$(cmd_ab "$port" get url 2>/dev/null | tail -1)
     cmd_ab "$port" state save "$auth" >/dev/null 2>&1 && chmod 600 "$auth"
     cmd_ab "$port" close >/dev/null 2>&1
+  elif [ -d "$STATE_DIR/profiles/$port-$(ab_mode "$port")" ]; then
+    # The session closed (idle timeout) after a login in its profile: read the profile back with
+    # no window, or the other mode opens logged out.
+    ( export DEV_UP_AB_NOWINDOW=1
+      cmd_ab "$port" open "http://localhost:$port/" >/dev/null 2>&1 &&
+        cmd_ab "$port" state save "$auth" >/dev/null 2>&1 && chmod 600 "$auth"
+      cmd_ab "$port" close >/dev/null 2>&1 )
   fi
   case "$url" in http*) ;; *) url="http://localhost:$port/" ;; esac
   [ -f "$(f "$port" state)" ] || state_write "$port" "session=$(session_id)" "dir=$(toplevel "$PWD")"
