@@ -102,6 +102,12 @@ sleep 1
 systemctl --user stop "dev-up-$P" 2>/dev/null
 for _ in $(seq 30); do grep -q 'SERVER DOWN' "$T/events" && break; sleep 0.25; done
 check "watch reports SERVER DOWN when the unit stops" "$(cat "$T/events")" "*dev-up: SERVER DOWN on port $P*"
+serve $P -- "python3 -m http.server $P" >/dev/null 2>&1
+"$DU" wait $P >/dev/null
+sleep 2 # the probe polls each second for the server coming back; a real server stays up longer
+systemctl --user stop "dev-up-$P" 2>/dev/null
+for _ in $(seq 40); do [ "$(grep -c 'SERVER DOWN' "$T/events")" -ge 2 ] && break; sleep 0.25; done
+check "the same watcher reports a second fall after a restart" "$(grep -c 'SERVER DOWN' "$T/events")" "2"
 kill -- -"$WATCH"; WATCH=""
 serve $P -- "python3 -m http.server $P" >/dev/null 2>&1
 "$DU" wait $P >/dev/null

@@ -59,6 +59,15 @@ if command -v agent-browser >/dev/null; then
   check "state show reports the browser" "$("$DU" state $P show | tail -1)" "browser_alive=yes mode=headless session=devup-$P"
   ab close >/dev/null
   check "ab close ends the session" "$("$DU" browser $P)" "*alive=no"
+  check "a command on a closed session reopens it on the app" "$(ab get title)" "eval-page"
+  export DEV_UP_AB_NOWINDOW=1
+  "$DU" show $P >/dev/null
+  ab eval "document.cookie='sid=logado; path=/; max-age=3600'" >/dev/null
+  ab close >/dev/null
+  "$DU" hide $P >/dev/null
+  check "hide after the window closed keeps the login" "$(ab eval 'document.cookie')" "*sid=logado*"
+  unset DEV_UP_AB_NOWINDOW
+  ab close >/dev/null
   rm -f "$T/app/index.html"
 else
   echo "skip agent-browser checks (agent-browser is not on PATH)"
@@ -127,6 +136,12 @@ sleep 1
 systemctl --user stop "dev-up-$P" 2>/dev/null
 for _ in $(seq 30); do grep -q 'SERVER DOWN' "$T/events" && break; sleep 0.25; done
 check "watch reports SERVER DOWN when the unit stops" "$(cat "$T/events")" "*dev-up: SERVER DOWN on port $P*"
+serve $P -- "python3 -m http.server $P" >/dev/null 2>&1
+"$DU" wait $P >/dev/null
+sleep 2 # the probe polls each second for the server coming back; a real server stays up longer
+systemctl --user stop "dev-up-$P" 2>/dev/null
+for _ in $(seq 40); do [ "$(grep -c 'SERVER DOWN' "$T/events")" -ge 2 ] && break; sleep 0.25; done
+check "the same watcher reports a second fall after a restart" "$(grep -c 'SERVER DOWN' "$T/events")" "2"
 kill -- -"$WATCH"; WATCH=""
 serve $P -- "python3 -m http.server $P" >/dev/null 2>&1
 "$DU" wait $P >/dev/null

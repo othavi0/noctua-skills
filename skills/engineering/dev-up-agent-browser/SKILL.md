@@ -139,8 +139,8 @@ with `[PORT]`.
   `http://localhost:4848`): every session streams live there with its console and network, and it
   costs no measurable RAM while nobody looks. Run it on every setup and put the URL in the handback.
 - **Take over**, only when the user asks to see or touch the page: `S show PORT` reopens the
-  session as a real window with cookies and storage carried over; `S hide PORT` returns to
-  headless. The window carries the class `agent-browser`; to keep it from taking focus, read
+  session as a real window with cookies and storage carried over, also from a session that
+  closed while idle; `S hide PORT` returns to headless. The window carries the class `agent-browser`; to keep it from taking focus, read
   [window focus](references/window-focus.md).
 
 ## 6. Hand back
