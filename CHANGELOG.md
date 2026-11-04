@@ -5,6 +5,14 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `dev-up-agent-browser`, atritos de uma validação com dois subagentes em
+  paralelo: o `ab` desliga a checagem de versão do Chrome
+  (`AGENT_BROWSER_NO_VERSION_CHECK=1`), que imprimia um aviso de CVE em todo
+  launch e consultava o blog de releases do Google; o título com a porta volta
+  depois de todo carregamento completo de página, não só do `open`; e a
+  `interacting.md` manda esperar a navegação da SPA com `wait --url` antes do
+  `get url`, que devolvia a URL antiga logo depois do clique.
+
 - `dev-up` e `dev-up-agent-browser`: o watcher avisa cada queda do servidor.
   Antes, o laço de queda avisava `SERVER DOWN` uma vez e terminava, e o tail
   seguia vivo. Como o Restart só re-arma um watcher morto, uma segunda queda

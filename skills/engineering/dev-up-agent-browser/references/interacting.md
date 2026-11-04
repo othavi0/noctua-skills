@@ -9,6 +9,9 @@ Read this before driving the app. Every browser call is `S ab PORT <agent-browse
 - **Screenshots for layout.** `S ab PORT screenshot /path/file.png`, then read the file. Text and
   refs come cheaper from `snapshot` and `get text`; keep the image for layout, CSS and render
   checks.
+- **Navigation settles before you read it.** A click on an SPA link changes the URL a moment
+  later: `S ab PORT wait --url '**/route'` (or `wait <selector>` of the new page), then
+  `get url`.
 - **Breakpoints.** `S ab PORT set viewport 390 844`, then confirm with
   `S ab PORT eval 'window.innerWidth'`. The viewport is emulated, so it holds in headless and in a
   tiled window alike.
