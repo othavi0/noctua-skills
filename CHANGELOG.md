@@ -5,6 +5,12 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `dev-up-agent-browser`: `browser PORT` não quebra mais quando nenhum
+  navegador está configurado (sem `chrome-headless-shell` do Playwright e sem
+  `AGENT_BROWSER_EXECUTABLE_PATH`). O `ab_env` desfaz a variável para a sessão
+  cair no Chrome do agent-browser, e o `cmd_browser` lia ela sem default sob
+  `set -u`, saindo com `unbound variable`. Ganhou uma checagem no eval.
+
 - `dev-up-agent-browser`, atritos de uma validação com dois subagentes em
   paralelo: o `ab` desliga a checagem de versão do Chrome
   (`AGENT_BROWSER_NO_VERSION_CHECK=1`), que imprimia um aviso de CVE em todo

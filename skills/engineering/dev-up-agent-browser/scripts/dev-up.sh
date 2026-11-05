@@ -453,7 +453,7 @@ cmd_dash() {
   if ! bound "$port"; then agent-browser dashboard start --port "$port" >/dev/null 2>&1 || die 3 "dashboard did not start"; fi
   say "DASH url=http://localhost:$port"
 }
-cmd_browser() { ( ab_env "$1"; say "mode=$(ab_mode "$1") session=$AGENT_BROWSER_SESSION exe=$AGENT_BROWSER_EXECUTABLE_PATH profile=$AGENT_BROWSER_PROFILE alive=$(ab_alive "$1" && echo yes || echo no)" ); }
+cmd_browser() { ( ab_env "$1"; say "mode=$(ab_mode "$1") session=$AGENT_BROWSER_SESSION exe=${AGENT_BROWSER_EXECUTABLE_PATH:-} profile=$AGENT_BROWSER_PROFILE alive=$(ab_alive "$1" && echo yes || echo no)" ); }
 
 cmd="${1:-}"; [ $# -gt 0 ] && shift
 if [ "$cmd" != unwatched ] && self=$(readlink -f "$0" 2>/dev/null) && [ "$self" != "$CACHE/dev-up.sh" ]; then

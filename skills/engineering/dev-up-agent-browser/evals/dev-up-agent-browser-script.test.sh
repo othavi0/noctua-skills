@@ -40,6 +40,8 @@ check "the unit gets the caller's PATH, env and node_modules/.bin" "$(grep -E 'o
 check "owner names the listener pid and who started it" "$("$DU" owner $P)" "BUSY pid=$(pgrep -f "http.server $P" | head -1) cwd=$T/app mine=yes via=dev-up state=mine"
 check "owner exits 0 when this checkout serves the port" "$("$DU" owner $P >/dev/null; echo "exit=$?")" "exit=0"
 check "preflight names the port this directory already serves" "$("$DU" preflight "$T/app")" "*warn served: this directory already serves port $P (pid *)*"
+# No headless shell, no env browser: the session falls back to agent-browser's own Chrome.
+check "browser works with no browser configured" "$(HOME="$T/nobrowser" PLAYWRIGHT_BROWSERS_PATH= AGENT_BROWSER_EXECUTABLE_PATH= DEV_UP_AB_HEADLESS= "$DU" browser $P2 2>&1)" "mode=headless session=devup-$P2 exe= profile=*"
 
 if command -v agent-browser >/dev/null; then
   export DEV_UP_AB_STATE="$T/abstate"
