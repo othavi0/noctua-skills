@@ -5,6 +5,12 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- Skill nova `nuvem`: manda a tarefa pesada a uma sessão do Claude Managed
+  Agents, espera, baixa o patch e o traz para revisar e entregar aqui. O crédito
+  mensal da API é teto: o script soma o gasto das sessões do mês e o teto das
+  que ainda rodam, e recusa a sessão nova que não cabe no crédito e no limite do
+  Console, ou quando não consegue ler o gasto. As notas de cada repo ficam em
+  `~/.config/nuvem/`, fora da skill.
 - `dev-up-agent-browser`: `browser PORT` não quebra mais quando nenhum
   navegador está configurado (sem `chrome-headless-shell` do Playwright e sem
   `AGENT_BROWSER_EXECUTABLE_PATH`). O `ab_env` desfaz a variável para a sessão
