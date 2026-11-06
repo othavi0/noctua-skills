@@ -2,7 +2,7 @@
 
 [![skills.sh](https://skills.sh/b/othavi0/noctua-skills)](https://skills.sh/othavi0/noctua-skills)
 
-Five Claude Code skills I use every day, packaged to drop into any project. Each
+Six Claude Code skills I use every day, packaged to drop into any project. Each
 one started as a bug I hit twice, and gets cut the moment it stops earning its
 place.
 
@@ -24,7 +24,7 @@ Claude Code.
 Prefer to install by hand? Clone the repo and copy a skill folder into
 `~/.claude/skills` (global) or `.claude/skills` (one project).
 
-`dev-up`, `dev-up-agent-browser` and `claude-md-prune` are model-invoked. Type them as a slash command
+`dev-up`, `dev-up-agent-browser`, `nuvem` and `claude-md-prune` are model-invoked. Type them as a slash command
 (`/dev-up 3000`) or let Claude reach for them when the task fits the description.
 `mobile-up` and `humanize-pt-br` run only when you type them.
 
@@ -69,6 +69,18 @@ next free one, and it never kills a process it did not start. The evidence goes
 into a question for you. Ten symptoms a device can show map to one check and
 one fix each. When none matches, the skill stops and asks you for the error
 text. Linux host, Android SDK for the emulator. iOS is out of scope.
+
+**[nuvem](./skills/engineering/nuvem/SKILL.md)** exists because a build, an E2E
+run and a before-and-after measurement do not fit on a laptop that is also running
+everything else. It sends the task to a Claude Managed Agents session paid by the
+monthly API credit, waits, fetches the patch and brings it back to review and
+deliver through your normal flow. The credit is a hard ceiling: before opening a
+session, the script adds what this month's sessions spent and the full cap of the
+ones still running, and refuses when the new cap does not fit under the credit and
+the Console spend limit. If it cannot read the spend, it refuses too. Per-repo
+notes in `~/.config/nuvem/` record how to get each project running in a bare
+container and every gate the local pipeline checks that the container cannot see,
+so the next patch does not pass there and fail here. Linux, an API key, `curl` and `jq`.
 
 **[claude-md-prune](./skills/engineering/claude-md-prune/SKILL.md)** runs because
 `CLAUDE.md` bloats into noise. Project memory grows by accretion: paths that moved,
