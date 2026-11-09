@@ -6,7 +6,7 @@ description: >-
   file exceeds ~200 lines AND has obvious derivable content (stack lists, directory trees,
   command listings); or asks for a "Boris-style", "mistakes-only", or "minimal" CLAUDE.md.
   Also flags drift: paths, commands, enums, ADRs that no longer match the code. Not for
-  adding content to CLAUDE.md or generating one from scratch — that's a different skill.
+  adding content to CLAUDE.md or generating one from scratch (claude-md-improver).
 ---
 
 # claude-md-prune
@@ -35,24 +35,6 @@ The CLAUDE.md is **advisory**: the model can drop a rule under context pressure,
 
 Claude Code's built-in `/doctor` (2.1.206+) also proposes trimming derivable content, but as a single pass with no drift fact-checking or per-file approval — this skill adds both.
 
-## When to trigger
-
-Trigger on any of these:
-
-- User says "audit", "refine", "trim", "prune", "shrink", "refactor" CLAUDE.md
-- User describes CLAUDE.md as "too long", "bloated", "stale", "outdated", "messy"
-- User says Claude is "ignoring CLAUDE.md", "didn't follow the rule", "asked something that was in the docs"
-- User mentions "Boris-style" / "mistakes-only" / "minimal" CLAUDE.md
-- User asks for a project audit or documentation audit and CLAUDE.md files exist
-- During unrelated work, you notice a CLAUDE.md file is > 200 lines AND has obvious derivable content (stack lists, directory trees, command listings) — proactively offer.
-
-**Out of scope** — do not trigger when the user wants to:
-
-- ADD content to CLAUDE.md, or generate one from scratch — if a complementary add-skill (e.g. `claude-md-improver`) is installed, route there; otherwise flag what's missing in the report and stop
-- Capture end-of-session learnings into CLAUDE.md — that's a capture workflow, not an audit
-
-Run this skill periodically (every 1-3 months, or whenever a CLAUDE.md grows beyond ~200 lines).
-
 ## Workflow
 
 Five phases. Always present the report BEFORE applying changes. On a long audit (monorepo, many files), if the conversation gets compacted mid-run, re-invoke this skill before Phases 4-5 — after compaction only a skill's first ~5k tokens are re-attached, and the tail of this workflow can silently vanish.
@@ -67,11 +49,11 @@ Locations to check:
 - `./CLAUDE.local.md` (personal, gitignored — may or may not exist)
 - Any `./**/CLAUDE.md` in monorepos (workspace/package-level)
 - `~/.claude/CLAUDE.md` (global) — **only if user explicitly asks for global scope**
-- `~/.claude/memory/*.md` (auto-memory) — **only if user explicitly asks**. Same Boris filter applies: each memory file should answer "would removing this make Claude make mistakes / lose non-obvious knowledge?" Cut derivable filesystem listings, memories that point back to CLAUDE.md without adding info, generic philosophy already known to Claude. KEEP specific gotchas, citations of real incidents, decision rationales, and project context not in the code.
+- `~/.claude/memory/*.md` and the per-project auto-memory in `~/.claude/projects/*/memory/` — **only if user explicitly asks**. Same Boris filter applies: each memory file should answer "would removing this make Claude make mistakes / lose non-obvious knowledge?" Cut derivable filesystem listings, memories that point back to CLAUDE.md without adding info, generic philosophy already known to Claude. KEEP specific gotchas, citations of real incidents, decision rationales, and project context not in the code.
 
 For each file: record line count and approximate size. **Files > 200 lines are prime candidates** for aggressive pruning. Files < 50 lines might still benefit from drift detection but rarely need cuts. Memory files are typically 10-50 lines each — apply per-file: does the description claim non-obvious knowledge that the body actually delivers, or is the body just paraphrasing the description? If paraphrasing, cut.
 
-Confirm the scope with `AskUserQuestion` before proceeding — options: project only (default, recommended: matches the common case and avoids touching shared or personal files by accident), project + `CLAUDE.local.md`, project + auto-memory (`~/.claude/memory/*.md`), or all of the above including global `~/.claude/CLAUDE.md`.
+Confirm the scope with `AskUserQuestion` before proceeding — options: project only (default, recommended: matches the common case and avoids touching shared or personal files by accident), project + `CLAUDE.local.md`, project + auto-memory (`~/.claude/memory/*.md`, `~/.claude/projects/*/memory/`), or all of the above including global `~/.claude/CLAUDE.md`.
 
 Then do one fast read-through of every CLAUDE.md in scope and tag each section with a rough call — likely CUT, or likely KEEP/rewrite — using the Phase 3 test below. This tagging is provisional; Phase 3 makes it final. It exists only to scope Phase 2.
 

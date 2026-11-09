@@ -1,11 +1,11 @@
 ---
 name: dev-up
 description: >-
-  Starts a project's dev server pinned to one port, opens a browser tab you own on it, and arms a
-  watcher on its log so you can hand control back and walk away. Use when invoking `/dev-up [port]`,
-  or when asked to start, open, view, run, serve, restart, or monitor this project's dev server on a
-  specific port, especially when other servers or browser tabs already run in parallel and must not
-  be disturbed. Not for an Expo app on a phone or emulator, that is mobile-up.
+  Starts this project's dev server on one port as a systemd user unit, pins a Claude in Chrome tab
+  you own on it, and arms a log watcher, without touching other servers or tabs. Use for
+  `/dev-up [port]`, or when asked to start, run, serve, restart, open or watch this project's dev
+  server on a port in the user's own browser. Not for headless or agent-browser testing
+  (dev-up-agent-browser), and not for an Expo app on a phone or emulator (mobile-up).
 # argument-hint, allowed-tools and hooks are Claude Code fields, not part of the Agent Skills spec.
 # Drop them before uploading this folder to claude.ai or the Skills API.
 argument-hint: "[port]"
@@ -28,9 +28,11 @@ One dev server on one **port**, one browser **tab** you own at that port, one **
 log. The port is the key: the server binds it, the tab points at it, and every file in
 `~/.cache/dev-up/` is named after it.
 
-`scripts/dev-up.sh` does the mechanical part. Run it as `bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh
-<command> PORT`, exactly that path, so `allowed-tools` matches. Every command prints its verdict on
-the first line (`FREE`, `READY`, `DIED`, ...). Write the state only through its `state` command.
+`scripts/dev-up.sh` does the mechanical part. A command below such as `owner PORT` is the Bash call
+`bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh owner 3000`: type the whole path at the start of every
+call, so `allowed-tools` matches, and never assign it to a shell variable. Every command prints its
+verdict on the first line (`FREE`, `READY`, `DIED`, ...). Write the state only through its `state`
+command.
 
 `PORT` below is the literal port number.
 
@@ -43,6 +45,18 @@ the first line (`FREE`, `READY`, `DIED`, ...). Write the state only through its 
   No `dev` script in the folder → say there is nothing to run. Otherwise ask for the port.
 - Called in the middle of other work, as a proof step: run every step anyway. The handback becomes
   one line in that task's report.
+
+## Gotchas
+
+- `S="bash ..."; $S owner 3000`, or the path inside an `eval` string, misses `allowed-tools`, and a
+  session isolated in a worktree refuses it as "a command whose name is computed at runtime".
+  Paste the whole path on every call.
+- In a session isolated in a worktree, run the script from that worktree. A `cd` to the main
+  checkout is refused with "Run the plain command from <worktree>".
+- Serving a port other than the one a `warn pinned port` line names breaks login: Better Auth
+  trusts only the origin in `BETTER_AUTH_URL`, and sign-in on the new port answers 403
+  `Invalid origin`. Prefix the dev command with every variable the `warn` lines name, pointed at
+  the served port: `BETTER_AUTH_URL=http://localhost:PORT next dev -p PORT`.
 
 ## 1. Who holds the port
 
@@ -66,7 +80,7 @@ the first line (`FREE`, `READY`, `DIED`, ...). Write the state only through its 
 
 1. `preflight` in the app's directory. Run every `run` line it prints; a `todo` line needs a
    decision. A `warn pinned port` line means an auth callback or CORS origin expects another port:
-   warn in one line and keep the user's port. A `warn served` line means this directory already
+   keep the user's port and prefix the dev command as in [Gotchas](#gotchas). A `warn served` line means this directory already
    runs a dev server on another port, and Next 16 starts one `next dev` per folder: use the server
    that runs, with no question. `state PORT rm`, say the real port in one line, and go back to
    step 1 with it.
@@ -146,6 +160,9 @@ Arm one Monitor: command `bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh watch PORT`
    3. The URL ended on a login route (`/login`, `/auth`, `/sign-in`, `/entrar`, `/acesso`,
       `/conta`) → stop and ask the user to log in. Credentials are the user's to type, in the tab
       and in curl alike. Continue when they confirm, then navigate to the route you need.
+      That holds for a seeded test user too: every tool that fills this tab takes the value as a
+      parameter, so it would reach the transcript. A test login the agent types belongs to
+      `dev-up-agent-browser`.
    4. Smoke, one `browser_batch`: `read_console_messages` (`onlyErrors: true`,
       `pattern: "error|failed|exception"`), `read_network_requests` (`urlPattern: "/api"` or the
       app's data origin), and `javascript_tool` with `document.visibilityState`.

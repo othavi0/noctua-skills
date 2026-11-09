@@ -5,6 +5,29 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `dev-up` e `dev-up-agent-browser`: a convenção do atalho mostra o caminho
+  inteiro do script e manda nunca guardá-lo em variável. Nos transcripts de 14
+  dias, 135 de 199 chamadas do `dev-up-agent-browser` e 27 do `dev-up` vieram
+  como `S="bash ..."; $S ...`, fora do `allowed-tools`, com 8 recusas do guard
+  de sessão isolada em worktree. As duas ganharam a seção `Gotchas`: caminho
+  inteiro, script rodado de dentro do worktree, e a porta que o `warn pinned
+  port` aponta, porque o Better Auth recusou o login do crm-next na porta 3003
+  com 403 `Invalid origin`. O comando de dev leva cada variável das linhas
+  `warn` apontada para a porta servida. As `description` separam a aba do
+  Claude in Chrome (`dev-up`), o teste headless (`dev-up-agent-browser`) e o
+  site público (`agent-browser`), e o eval de gatilho do `dev-up` ganha o
+  negativo `/dev-up-agent-browser 3000`.
+- `dev-up-agent-browser`: a pedido do user, o agente entra com usuário de seed
+  cuja senha está num arquivo local do repo, preenchendo o campo de dentro do
+  comando, sem o valor passar pelo transcript. Na `dev-up` o login continua
+  com o user, porque as ferramentas da aba recebem o valor como parâmetro.
+- `claude-md-prune`: a descoberta cita a auto-memória por projeto em
+  `~/.claude/projects/*/memory/`. Sai a seção `When to trigger`, que repetia a
+  `description`, e a `description` nomeia o `claude-md-improver`.
+- `humanize-pt-br`: sai a referência ao `verificador-factual`, agente que não
+  existe. A lista de marcas que mais escapam ganha o comentário curto para rede
+  social que reconta a fonte ou anuncia o gênero.
+
 - Skill nova `nuvem`: manda a tarefa pesada a uma sessão do Claude Managed
   Agents, espera, baixa o patch e o traz para revisar e entregar aqui. O crédito
   mensal da API é teto: o script soma o gasto das sessões do mês e o teto das

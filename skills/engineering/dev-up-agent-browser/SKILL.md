@@ -1,11 +1,12 @@
 ---
 name: dev-up-agent-browser
 description: >-
-  Runs a project's dev server on one port and drives the app through an agent-browser session
-  (headless, a visible window on request), with a watcher on the server log. Use for
-  `/dev-up-agent-browser [port]`, to test or check a local app with agent-browser, or to let
-  several agents test local apps at once on little RAM. The Claude in Chrome tab is dev-up; an
-  Expo app on a device is mobile-up.
+  Runs this project's dev server on one port and drives the app through an agent-browser session
+  named after that port (headless, a visible window on request), with a log watcher. Use for
+  `/dev-up-agent-browser [port]`, when asked to test, click through or check a local app with
+  agent-browser or headless, or when several agents test local apps at once on little RAM. Not for
+  the user's own Chrome tab (dev-up), a public website (agent-browser) or an Expo app on a device
+  (mobile-up).
 # argument-hint, allowed-tools and hooks are Claude Code fields, not part of the Agent Skills spec.
 argument-hint: "[port]"
 allowed-tools:
@@ -33,9 +34,10 @@ on the server log. The port is the key: the server binds it, the session is name
 is every file in `~/.cache/dev-up-ab/`. The session's profile and saved login live in
 `~/.local/state/dev-up-ab/`, so a login outlives the browser.
 
-`S` below is `bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh`, written out in full on every call so
-`allowed-tools` matches. Each command prints its verdict on the first line (`FREE`, `READY`,
-`SWITCHED`, ...). `PORT` is the literal port number.
+In this file `S owner PORT` is notation for the Bash call
+`bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh owner 3000`: type the whole path at the start of every
+call, so `allowed-tools` matches, and never assign it to a shell variable. Each command prints its
+verdict on the first line (`FREE`, `READY`, `SWITCHED`, ...). `PORT` is the literal port number.
 
 ## The one rule: every browser call goes through `S ab PORT`
 
@@ -61,6 +63,18 @@ session runs.
 - Called inside other work as a proof step: run every step; the handback becomes one line in that
   task's report.
 
+## Gotchas
+
+- `S="bash ..."; $S owner 3000`, or the path inside an `eval` string, misses `allowed-tools`, and a
+  session isolated in a worktree refuses it as "a command whose name is computed at runtime".
+  Paste the whole path on every call.
+- In a session isolated in a worktree, run the script from that worktree. A `cd` to the main
+  checkout is refused with "Run the plain command from <worktree>".
+- Serving a port other than the one a `warn pinned port` line names breaks login: Better Auth
+  trusts only the origin in `BETTER_AUTH_URL`, and sign-in on the new port answers 403
+  `Invalid origin`. Prefix the dev command with every variable the `warn` lines name, pointed at
+  the served port: `BETTER_AUTH_URL=http://localhost:PORT next dev -p PORT`.
+
 ## 1. Who holds the port
 
 `S owner PORT` prints `FREE`, or `BUSY pid=N cwd=DIR mine=... via=... state=...`:
@@ -82,8 +96,8 @@ Done when `S state PORT show` prints this checkout's `dir`.
 ## 2. Start the server
 
 1. `S preflight` in the app's directory. Run every `run` line; a `todo` line needs a decision.
-   `warn pinned port`: an auth callback or CORS origin expects another port; say so in one line and
-   keep the user's port. `warn served`: this directory already serves another port; use that
+   `warn pinned port`: an auth callback or CORS origin expects another port; keep the user's port
+   and prefix the dev command as in [Gotchas](#gotchas). `warn served`: this directory already serves another port; use that
    server, `S state PORT rm`, name the real port, and restart at step 1 with it.
 2. Take the dev command from the manifest. In a monorepo (`workspaces`, `turbo.json`,
    `pnpm-workspace.yaml`, `nx.json`) list the workspaces with a `dev` script, ask with
@@ -120,7 +134,11 @@ Done when `S state PORT show` prints `watcher_alive=yes`.
 1. `S ab PORT open http://localhost:PORT/`.
 2. `S ab PORT get url`. On a login route (`/login`, `/auth`, `/sign-in`, `/entrar`, `/acesso`,
    `/conta`): `S show PORT`, ask the user to log in in that window, and `S hide PORT` once they
-   confirm. The login travels with the switch and stays in the profile.
+   confirm. The login travels with the switch and stays in the profile. One exception: when the
+   user asks you to log in as a seeded test user whose password sits in a local file of the repo,
+   fill the field from that file inside the command, so the value never reaches the transcript:
+   `S ab PORT fill @ref "$(jq -r '.KEY' FILE)"`. A session isolated in a worktree refuses the
+   `$(...)`; there, ask the user to log in.
 3. Smoke: `S ab PORT errors`, `S ab PORT console`, `S ab PORT network requests --filter /api` (or
    the app's data origin).
 4. Port in the title, so the dashboard and window lists name it: `S ab PORT eval '<script>'` with

@@ -26,7 +26,7 @@ Feito quando o scan sai com código 0 e cada aviso que ficou tem o motivo dito n
 
 ## Marcas que mais escapam
 
-Estas passaram em PRs publicados mesmo com a skill carregada. O catálogo tem as 49 marcas com antes e depois.
+Estas passaram em textos publicados mesmo com a skill carregada. O catálogo tem as 49 marcas com antes e depois.
 
 1. Contraste de palco (17, 18): "não é X. É Y", "não só X, mas Y", "Não porque X. Porque Y", ", não Z." no fim da frase. Diga Y direto.
 2. Tripla (19): três itens, verbos ou frases curtas em série para dar ritmo. Fique com dois ou liste os quatro reais. Anáfora ("vira X, vira Y, e vira Z") continua tripla.
@@ -37,12 +37,13 @@ Estas passaram em PRs publicados mesmo com a skill carregada. O catálogo tem as
 7. Seta fora de bloco de código: "passou de 100644 para 100755".
 8. Vocabulário inflado (1, 4), abertura formulaica (3) e fecho genérico (35).
 9. Doc que narra o diff (37): descreva o estado atual.
+10. Comentário curto para rede social que reconta a fonte (o vídeo, o post) ou anuncia o gênero ("isso aqui é um comentário"). Escreva a reação ou o acréscimo que a fonte não tem.
 
 ## Não-fabricação
 
 A reescrita não pode conter fato, nome, número, data ou citação que não esteja na fonte ou no pedido. Também contam como fato o tempo gasto e a vivência ("passei a tarde nisso", "todo projeto que acompanho"), a consequência que a fonte não diz ("ficava 14 dias sem saída") e a troca de força ("nunca" para "raramente", "sempre" para "em geral"). Trocar vago por específico só vale quando o específico existe no material. Opinião e reação contam como voz, não como fato, e só entram em texto autoral. Uma fabricação é defeito mesmo que soe mais humana que o original vago. (Exceção: ficção, onde inventar detalhe é o trabalho.)
 
-Confira cada número, contagem e afirmação verificável contra a fonte com um comando. Quando a sessão tem `verificador-factual`, rode esta skill antes dele, e edição feita depois da verificação volta para ele.
+Confira cada número, contagem e afirmação verificável contra a fonte com um comando.
 
 ## Modos de invocação
 

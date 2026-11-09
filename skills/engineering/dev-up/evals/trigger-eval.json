@@ -9,6 +9,7 @@
   {"query": "monitor the app on localhost:3000, ping me if it throws an error", "should_trigger": true},
   {"query": "start up port 5000 for this repo, I've got two other dev-up sessions running elsewhere", "should_trigger": true},
   {"query": "quero rodar o dev server nessa porta e já deixar uma aba do navegador aberta nele", "should_trigger": true},
+  {"query": "/dev-up-agent-browser 3000", "should_trigger": false},
   {"query": "sobe o app Expo no emulador Android, preciso testar no celular", "should_trigger": false},
   {"query": "run the app on my phone with Expo Go and open it", "should_trigger": false},
   {"query": "who is holding port 8081", "should_trigger": false},
