@@ -134,7 +134,11 @@ Done when `S state PORT show` prints `watcher_alive=yes`.
 1. `S ab PORT open http://localhost:PORT/`.
 2. `S ab PORT get url`. On a login route (`/login`, `/auth`, `/sign-in`, `/entrar`, `/acesso`,
    `/conta`): `S show PORT`, ask the user to log in in that window, and `S hide PORT` once they
-   confirm. The login travels with the switch and stays in the profile.
+   confirm. The login travels with the switch and stays in the profile. One exception: when the
+   user asks you to log in as a seeded test user whose password sits in a local file of the repo,
+   fill the field from that file inside the command, so the value never reaches the transcript:
+   `S ab PORT fill @ref "$(jq -r '.KEY' FILE)"`. A session isolated in a worktree refuses the
+   `$(...)`; there, ask the user to log in.
 3. Smoke: `S ab PORT errors`, `S ab PORT console`, `S ab PORT network requests --filter /api` (or
    the app's data origin).
 4. Port in the title, so the dashboard and window lists name it: `S ab PORT eval '<script>'` with

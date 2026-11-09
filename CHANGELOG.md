@@ -15,7 +15,12 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
   com 403 `Invalid origin`. O comando de dev leva cada variável das linhas
   `warn` apontada para a porta servida. As `description` separam a aba do
   Claude in Chrome (`dev-up`), o teste headless (`dev-up-agent-browser`) e o
-  site público (`agent-browser`).
+  site público (`agent-browser`), e o eval de gatilho do `dev-up` ganha o
+  negativo `/dev-up-agent-browser 3000`.
+- `dev-up-agent-browser`: a pedido do user, o agente entra com usuário de seed
+  cuja senha está num arquivo local do repo, preenchendo o campo de dentro do
+  comando, sem o valor passar pelo transcript. Na `dev-up` o login continua
+  com o user, porque as ferramentas da aba recebem o valor como parâmetro.
 - `claude-md-prune`: a descoberta cita a auto-memória por projeto em
   `~/.claude/projects/*/memory/`. Sai a seção `When to trigger`, que repetia a
   `description`, e a `description` nomeia o `claude-md-improver`.

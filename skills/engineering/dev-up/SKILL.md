@@ -160,6 +160,9 @@ Arm one Monitor: command `bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh watch PORT`
    3. The URL ended on a login route (`/login`, `/auth`, `/sign-in`, `/entrar`, `/acesso`,
       `/conta`) → stop and ask the user to log in. Credentials are the user's to type, in the tab
       and in curl alike. Continue when they confirm, then navigate to the route you need.
+      That holds for a seeded test user too: every tool that fills this tab takes the value as a
+      parameter, so it would reach the transcript. A test login the agent types belongs to
+      `dev-up-agent-browser`.
    4. Smoke, one `browser_batch`: `read_console_messages` (`onlyErrors: true`,
       `pattern: "error|failed|exception"`), `read_network_requests` (`urlPattern: "/api"` or the
       app's data origin), and `javascript_tool` with `document.visibilityState`.
