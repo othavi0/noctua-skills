@@ -1,6 +1,6 @@
 # Keep criteria
 
-Content that survives the canonical test in SKILL.md Phase 3 ("Would Claude make mistakes if I removed this line?"). These are the survivors after applying the Boris/Anthropic filter.
+Content that survives the two tests in SKILL.md Phase 3: "Would Claude make mistakes if I removed this line?" and "Would Claude spend many tool calls rediscovering it in every session?".
 
 When the user pushes back on cutting something, it's usually because it falls into one of these categories — make sure to recognize them.
 
@@ -80,16 +80,28 @@ Rules that don't belong to a single workspace or directory — they apply projec
 
 **Why keep:** these apply to dozens of files. Localizing them to one package's CLAUDE.md would lose coverage; baking them into hooks would be too coarse. Root CLAUDE.md is the right place.
 
+## 7. Costly-to-rediscover pointers
+
+One line that replaces a long or misleading search.
+
+**Looks like:**
+
+- "Single test: `bun test --filter <name> apps/api` from the repo root. Plain `bun run test` runs the 12-minute e2e suite."
+- The exact test, typecheck, and lint commands, even when they match a script name.
+- "Stripe webhooks are handled in `apps/worker/src/inbound/`, not in `apps/api`. Grepping `stripe` lands on the dead copy in `legacy/stripe/` first."
+
+**Why keep:** the code does contain the answer, but finding it costs many tool calls in every session, or the first hit is wrong. A whole tree or a full script list does not qualify; only the line the search would otherwise have to earn.
+
 ## How to spot a survivor
 
-For each candidate, ask two questions, then apply the canonical test from SKILL.md Phase 3:
+For each candidate, ask in order:
 
-1. **Is this guessable from reading the code?** If yes → cut.
-2. **Is this a language/framework default Claude already knows?** If yes → cut.
-3. Otherwise, apply the canonical test. If it did fix a real bug, or encodes a non-obvious decision → KEEP.
+1. **Is this a language/framework default Claude already knows?** If yes → cut.
+2. **Does one `ls` or one manifest read show it?** If yes → cut, except the commands that verify work (test, typecheck, lint, single test), which stay even when they match a script name.
+3. Otherwise, apply the two tests. If it fixed a real bug, encodes a non-obvious decision, or saves a long rediscovery → KEEP.
 
-When in doubt on the canonical test, ask the user — they remember the history.
+When in doubt, ask the user — they remember the history.
 
 ## How much survives
 
-There is no fixed percentage to aim for. How much a CLAUDE.md loses in a first prune depends entirely on how much of it was written as documentation (stack lists, architecture explainers, tutorials — almost all of that cuts) versus written as a mistakes log (gotchas, P0 invariants, incident notes — almost all of that stays). The result of an audit is the sum of what got classified CUT in Phase 3, never a target to hit.
+There is no fixed percentage to aim for. How much a CLAUDE.md loses in a first prune depends entirely on how much of it was written as documentation (stack lists, architecture explainers, tutorials — almost all of that cuts) versus written as a mistakes log (gotchas, P0 invariants, incident notes, costly pointers — almost all of that stays). The result of an audit is the sum of what got classified CUT in Phase 3, never a target to hit.

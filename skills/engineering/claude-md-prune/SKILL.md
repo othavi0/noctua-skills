@@ -11,51 +11,28 @@ description: >-
 
 # claude-md-prune
 
-This skill aggressively removes content from CLAUDE.md files that Claude can already infer from the code, and flags claims in the doc that no longer match reality (subtractive only — see Anti-instructions).
-
-## Why this skill exists
-
-Two sources converge on the same operational philosophy:
-
-**Anthropic best-practices** ([code.claude.com/docs/en/best-practices](https://code.claude.com/docs/en/best-practices)):
-
-> Treat CLAUDE.md like code: review it when things go wrong, prune it regularly, and test changes by observing whether Claude's behavior actually shifts.
->
-> For each line, ask: "Would removing this cause Claude to make mistakes?" If not, cut it.
->
-> Bloated CLAUDE.md files cause Claude to ignore your actual instructions.
-
-**[howborisusesclaudecode.com](https://howborisusesclaudecode.com)** (a third-person write-up of how Boris Cherny, creator of Claude Code, works):
-
-> Ruthlessly edit your CLAUDE.md over time. Keep iterating until Claude's mistake rate measurably drops.
-
-Anthropic's best-practices page (quoted above) draws the same line in its include/exclude table: keep the file to rules that fix recurring mistakes; anything Claude can figure out by reading the code, and standard language conventions, belong elsewhere.
-
-The CLAUDE.md is **advisory**: the model can drop a rule under context pressure, and there is no published adherence figure. For rules that must execute 100% of the time, use a **hook** instead. As the Anthropic quote above says, bloat makes Claude ignore the instructions that matter.
-
-Claude Code's built-in `/doctor` (2.1.206+) also proposes trimming derivable content, but as a single pass with no drift fact-checking or per-file approval — this skill adds both.
+This skill removes from CLAUDE.md what Claude gets cheaply from the code, and flags claims that no longer match the code. It is subtractive only (see Anti-instructions).
 
 ## Workflow
 
-Five phases. Always present the report BEFORE applying changes. On a long audit (monorepo, many files), if the conversation gets compacted mid-run, re-invoke this skill before Phases 4-5 — after compaction only a skill's first ~5k tokens are re-attached, and the tail of this workflow can silently vanish.
+Five phases. Always present the report BEFORE applying changes.
 
 ### Phase 1: Discovery
 
-Find every CLAUDE.md in scope. Default scope is the current project.
+Find every instruction file in scope. Default scope is the current project, and it needs no confirmation:
 
-Locations to check:
+- `./CLAUDE.md` and `./.claude/CLAUDE.md`
+- `./.claude/rules/**/*.md`
+- Every file a CLAUDE.md in scope pulls in with an `@path` import, followed through nested imports (Claude Code stops at four hops). An imported file loads with the file that imports it and costs the same context as an inline section.
+- Any `./**/CLAUDE.md` in subdirectories (workspace/package-level)
 
-- `./CLAUDE.md` (project root)
-- `./CLAUDE.local.md` (personal, gitignored — may or may not exist)
-- Any `./**/CLAUDE.md` in monorepos (workspace/package-level)
-- `~/.claude/CLAUDE.md` (global) — **only if user explicitly asks for global scope**
-- `~/.claude/memory/*.md` and the per-project auto-memory in `~/.claude/projects/*/memory/` — **only if user explicitly asks**. Same Boris filter applies: each memory file should answer "would removing this make Claude make mistakes / lose non-obvious knowledge?" Cut derivable filesystem listings, memories that point back to CLAUDE.md without adding info, generic philosophy already known to Claude. KEEP specific gotchas, citations of real incidents, decision rationales, and project context not in the code.
+The first three load at session start, so their bloat is paid in every session: prune them first. A subdirectory CLAUDE.md and a rule with `paths:` frontmatter load only when Claude touches a matching file. Their bloat costs less, their drift costs the same.
 
-For each file: record line count and approximate size. **Files > 200 lines are prime candidates** for aggressive pruning. Files < 50 lines might still benefit from drift detection but rarely need cuts. Memory files are typically 10-50 lines each — apply per-file: does the description claim non-obvious knowledge that the body actually delivers, or is the body just paraphrasing the description? If paraphrasing, cut.
+Out of the project, only when the user names it: `./CLAUDE.local.md` (personal), `~/.claude/CLAUDE.md` and `~/.claude/rules/` (global), memory files (see Memory files below). Ask with `AskUserQuestion` only when the request leaves it unclear whether one of these is wanted, such as "clean up all my Claude instructions". Otherwise proceed with the project scope and state it in the report.
 
-Confirm the scope with `AskUserQuestion` before proceeding — options: project only (default, recommended: matches the common case and avoids touching shared or personal files by accident), project + `CLAUDE.local.md`, project + auto-memory (`~/.claude/memory/*.md`, `~/.claude/projects/*/memory/`), or all of the above including global `~/.claude/CLAUDE.md`.
+For each file: record line count and approximate size. **Files > 200 lines are prime candidates** for aggressive pruning. Files < 50 lines might still benefit from drift detection but rarely need cuts.
 
-Then do one fast read-through of every CLAUDE.md in scope and tag each section with a rough call — likely CUT, or likely KEEP/rewrite — using the Phase 3 test below. This tagging is provisional; Phase 3 makes it final. It exists only to scope Phase 2.
+Then do one fast read-through of every file in scope and tag each section with a rough call — likely CUT, or likely KEEP/rewrite — using the Phase 3 tests below. This tagging is provisional; Phase 3 makes it final. It exists only to scope Phase 2.
 
 ### Phase 2: Drift detection (fact-checking against code)
 
@@ -78,23 +55,24 @@ See `references/drift-checks.md` for the full checklist per stack and example ev
 
 Phase 2 is complete only when every claim type in that checklist has been checked against the code for every likely-KEEP/rewrite section in scope — not just until the first drift is found.
 
-### Phase 3: Categorize content (the Boris filter)
+### Phase 3: Categorize content
 
-For each section or bullet in the CLAUDE.md, apply the canonical test:
+For each section or bullet in the CLAUDE.md, apply two tests in order:
 
-> **Would Claude make mistakes if I removed this line?**
+> 1. **Would Claude make mistakes if I removed this line?**
+> 2. **Would Claude spend many tool calls rediscovering it in every session?**
 
-If "no" → it's noise. If "yes" → preserve. When unclear, default to **ASK the user** rather than cut blindly; the user may know history (past bugs, specific incidents) that explains why an apparently generic rule exists.
+"Yes" to either → preserve. "No" to both → it's noise. Test 2 is about cost, not possibility: everything in a repo is derivable eventually. A line passes test 2 when it replaces a search that is long or that lands on the wrong place first (the one command that runs a single test, the directory that actually owns a feature when the obvious name points elsewhere). A line that restates what one `ls` or one manifest read shows fails it. When unclear, default to **ASK the user** rather than cut blindly; the user may know history (past bugs, specific incidents) that explains why an apparently generic rule exists.
 
 Classify each section/bullet into one of five buckets:
 
-#### CUT (derivable from code or generic knowledge)
+#### CUT (cheaply derivable from code, or generic knowledge)
 
 Common patterns to remove:
 
 - **Stack / dependency lists** (read the manifest)
-- **Directory structure trees** (read the filesystem)
-- **Command listings** (read manifest scripts)
+- **Directory structure trees** (read the filesystem); keep the one-line pointer that passes test 2
+- **Command listings** (read manifest scripts); keep the commands that verify work (test, typecheck, lint, single test) and any command Claude would not guess from the script names
 - **Environment variable lists** (read env validation source)
 - **Architecture descriptions / explainers** (Claude reads the code)
 - **Per-folder descriptions** ("what each folder does")
@@ -105,9 +83,9 @@ Common patterns to remove:
 
 See `references/cut-criteria.md` for detailed examples per category.
 
-#### KEEP (mistakes-recurrent or genuinely non-obvious)
+#### KEEP (prevents a mistake, or saves a long rediscovery)
 
-These survive the filter:
+These survive:
 
 - **P0 invariants** (e.g., "never import X from Y", "never set cookie domain to Z")
 - **Gotchas with specific symptom + workaround** (framework bugs, version-specific issues, library quirks)
@@ -115,6 +93,7 @@ These survive the filter:
 - **Non-obvious architectural decisions** (server-wins on conflict, ownership rules, isolation boundaries)
 - **Specific bugs Claude has made before** (the compounding-engineering log)
 - **Cross-cutting rules** that span multiple files
+- **Costly-to-rediscover pointers** (test 2): a non-guessable command, or where a feature really lives when the obvious name misleads
 
 See `references/keep-criteria.md` for examples and rationale per category.
 
@@ -140,52 +119,9 @@ Flag candidates here — actual hook creation is out of scope for this skill (su
 
 ### Phase 4: Quality report
 
-ALWAYS output the full report before applying any changes — nothing gets written until Phase 5's approval.
+ALWAYS output the full report before applying any changes. Nothing gets written until Phase 5's approval.
 
-Format:
-
-```
-## CLAUDE.md Prune Report
-
-### Summary
-- Files audited: <N>
-- Drift issues found: <N>
-- Files > 200 lines (prime candidates): <list>
-- Result of this audit: the sum of everything classified CUT below — never a target percentage
-
-### File: ./CLAUDE.md (root) — <N> lines
-
-#### Drift (factual errors detected, and where a section is stale enough that the fix is a rewrite)
-1. References path `X/Y/Z.md` which does not exist (renamed? deleted?)
-2. Cites command `bun db:generate` but `package.json` does not contain it
-3. Enum declared as `['a','b','c']` but `schema/foo.ts` shows `['a','b']`
-4. ADR-0004 referenced as authoritative but ADR-0009 (2026-05-18) supersedes that flow
-5. "Schema is push-only" (line 133): ADR-0009 made this more nuanced. Suggest rewording to: "..."
-
-#### Sections to CUT
-- Lines 14-30 "Stack": derivable from `package.json`
-- Lines 35-71 "Topology": derivable from `ls`
-- Lines 75-110 "Daily Commands": derivable from `package.json` scripts
-- Lines 217-228 "MCP Servers": derivable from `.mcp.json`
-
-#### Sections to KEEP
-- "Auth invariants P0" (lines 120-138): each bullet is a real isolation rule — KEEP
-- "Anti-patterns banidos" (lines 250-266): each is a specific bug pattern — KEEP
-- "Drizzle-kit push + TTY" (line 276): gotcha with specific symptom — KEEP
-
-#### Sections to MOVE TO CLAUDE.local.md
-- "I prefer succinct responses" (line 301): personal preference, not team-shared
-
-#### Sections to MOVE TO WORKSPACE-LOCAL CLAUDE.md
-- "Drizzle migration workflow" (lines 310-325): only applies to `packages/db`, not cross-cutting
-
-#### Sections to MOVE TO HOOK
-- "Always run `bun fix` after writes" (line 282): 100% enforcement → already a PostToolUse hook (no action needed)
-
-### File: ./packages/api/CLAUDE.md (workspace) — <N> lines
-
-[... per-file breakdown ...]
-```
+Use the format in `references/report-template.md`. State the scope you audited in the Summary. The result of an audit is the sum of everything classified CUT, never a target percentage.
 
 ### Phase 5: Apply with approval
 
@@ -195,9 +131,18 @@ For each approved file, apply the cut by `Edit`, one call per approved line rang
 
 After applying:
 
-- Print the final line count reduction (this validates the work and reinforces the habit)
+- Print the line count before and after. That number is not the result: tell the user the prune worked if, over the next sessions, Claude follows the surviving rules more often and re-asks or re-explores nothing that was cut. A cut line that causes either goes back in.
 - Suggest the user re-run this skill periodically (every 1-3 months, or whenever a CLAUDE.md grows above ~200 lines) — and offer to create a scheduled task firing this skill on that cadence, so the recurrence doesn't depend on anyone's memory
 - If hook candidates were identified, suggest invoking `update-config` skill to wire them up
+
+## Memory files
+
+Opt-in only: `~/.claude/memory/*.md` and the per-project auto-memory in `~/.claude/projects/*/memory/`. These are notes, not project instructions, so Phase 2 does not apply unless a note cites a path or command. Judge each file whole:
+
+- CUT a note that lists what the filesystem shows, points back to CLAUDE.md without adding anything, restates generic philosophy, or whose body only paraphrases its own description.
+- KEEP specific gotchas, real incidents, decision rationales, and project context that is not in the code.
+
+Report and apply as in Phases 4-5, one approval per file. A deleted note's line in the `MEMORY.md` index goes with it, under that note's approval.
 
 ## Anti-instructions
 
@@ -213,5 +158,6 @@ These are the easy ways to misuse the skill — avoid each:
 ## References
 
 - `references/cut-criteria.md` — categories of removable content with examples per stack
+- `references/report-template.md` — the Phase 4 report format
 - `references/keep-criteria.md` — what survives the filter, with rationale
 - `references/drift-checks.md` — fact-checking checklist universal across languages

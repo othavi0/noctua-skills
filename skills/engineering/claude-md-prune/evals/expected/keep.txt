@@ -1,0 +1,7 @@
+- `bun run lint` runs the linter
+- Single test: `bun test --filter <name> apps/api` from the repo root. Plain `bun run test` runs the 12-minute e2e suite.
+- After `bun db:push`, always run `bun db:apply-triggers`. drizzle-kit does not generate triggers.
+- Stripe webhooks are handled in `apps/worker/src/inbound/`, not in `apps/api`. Grepping `stripe` lands on the dead copy in `legacy/stripe/` first.
+- `apps/web` never imports from `apps/api/src`. They share types through `packages/db` only.
+- Never set the session cookie domain to `.fixture.shop`. Each subdomain is a separate trust zone.
+- `db.execute()` returns timestamps as strings in Drizzle 0.45. Coerce with `toDate()` at the boundary.
