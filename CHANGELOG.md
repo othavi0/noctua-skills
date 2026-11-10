@@ -21,6 +21,21 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
   cuja senha está num arquivo local do repo, preenchendo o campo de dentro do
   comando, sem o valor passar pelo transcript. Na `dev-up` o login continua
   com o user, porque as ferramentas da aba recebem o valor como parâmetro.
+- `claude-md-prune`: a fase 3 ganha um segundo teste, "Claude gastaria muitas
+  chamadas para redescobrir isto em toda sessão?". Ficam os comandos de
+  verificação (teste, typecheck, lint, teste único) e o ponteiro de uma linha
+  para onde algo mora quando o nome óbvio engana. A descoberta inclui
+  `.claude/CLAUDE.md`, `.claude/rules/` e os arquivos de `@path`, e separa o que
+  carrega no início da sessão do que carrega sob demanda. O escopo do projeto
+  segue sem pergunta. A poda de memória virou seção própria. Saem a seção `Why
+  this skill exists`, com três citações que a página best-practices não traz
+  mais, a versão do `/doctor` e o aviso de compactação, porque o `SKILL.md`
+  caiu de 13.953 para 11.915 bytes e cabe nos 5.000 tokens que voltam depois
+  dela. O template do relatório foi para `references/report-template.md`. A
+  contagem de linhas deixa de valer como prova do resultado. Eval de saída
+  novo: `evals/fixture/` é um repo mínimo e `evals/prune-check.sh` confere que
+  cada linha de `expected/keep.txt` sobrevive literal e nenhuma de
+  `expected/cut.txt` fica.
 - `claude-md-prune`: a descoberta cita a auto-memória por projeto em
   `~/.claude/projects/*/memory/`. Sai a seção `When to trigger`, que repetia a
   `description`, e a `description` nomeia o `claude-md-improver`.

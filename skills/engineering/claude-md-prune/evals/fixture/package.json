@@ -1,0 +1,24 @@
+{
+  "name": "fixture-shop",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "test": "turbo test",
+    "lint": "biome check .",
+    "db:push": "drizzle-kit push",
+    "db:apply-triggers": "bun packages/db/apply-triggers.ts"
+  },
+  "dependencies": {
+    "next": "16.0.0",
+    "react": "19.0.0",
+    "drizzle-orm": "0.45.0",
+    "better-auth": "1.6.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.0",
+    "drizzle-kit": "0.31.0",
+    "turbo": "2.5.0"
+  }
+}

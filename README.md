@@ -84,9 +84,11 @@ so the next patch does not pass there and fail here. Linux, an API key, `curl` a
 
 **[claude-md-prune](./skills/engineering/claude-md-prune/SKILL.md)** runs because
 `CLAUDE.md` bloats into noise. Project memory grows by accretion: paths that moved,
-commands that changed, advice the code already enforces. The skill runs the Boris
-Cherny / Anthropic filter, *"Would removing this cause Claude to make mistakes?" If
-not, cut it*, and flags the lines that drifted out of sync with the code.
+commands that changed, advice the code already enforces. The skill asks two
+questions of every line: would Claude make a mistake without it, and would Claude
+spend many tool calls finding it again in every session. A line that fails both
+goes. The skill also flags the lines that drifted out of sync with the code, and
+covers `.claude/rules/` and `@path` imports along with `CLAUDE.md`.
 
 ## Writing
 

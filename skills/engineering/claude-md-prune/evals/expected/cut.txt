@@ -1,0 +1,13 @@
+- Frontend: Next.js 16, React 19
+  worker/       Job queue
+- `bun run build` builds for production
+- Prefer const over let
+- Write clean, readable code
+2. Copy `.env.example` to `.env`
+- I prefer succinct responses in Portuguese.
+  web/          Frontend
+  db/           Database client + schema
+- `bun run dev` starts the dev server
+- Use TypeScript with strict mode
+- Handle errors properly
+3. Run `bun install`

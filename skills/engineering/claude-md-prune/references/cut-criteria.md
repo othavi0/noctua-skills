@@ -1,6 +1,6 @@
 # Cut criteria
 
-Content categories that Claude can infer from the code or from generic language knowledge. Cut aggressively.
+Content categories that Claude gets cheaply from the code or from generic language knowledge. Cut aggressively, except the single lines that pass test 2 in SKILL.md Phase 3 (costly to rediscover in every session). Each category's **Exception** names them.
 
 When showing the user **why** a section is being cut, cite the specific category here so the reasoning is consistent across the audit.
 
@@ -57,7 +57,7 @@ packages/
   ui/           Component library
 ```
 
-**Exception:** if there's a non-obvious convention encoded in folder names (e.g., underscore prefix means "private to this route" in Next.js App Router), keep that convention as a one-liner. Cut the tree.
+**Exception:** if there's a non-obvious convention encoded in folder names (e.g., underscore prefix means "private to this route" in Next.js App Router), keep that convention as a one-liner. Keep too a one-line pointer to where something lives when the obvious name misleads (e.g., "Stripe webhooks are handled in `apps/worker/src/inbound/`, not in `apps/api`"). Cut the tree.
 
 ## 3. Command listings
 
@@ -76,7 +76,7 @@ bun run test   Run tests
 bun run lint   Lint
 ```
 
-**Exception:** keep a command **only if** it carries non-obvious context (order matters, side effects, must-do-after). Example to keep: "After `bun db:push`, always run `bun db:apply-triggers` — drizzle-kit does not generate triggers." That's a gotcha, not a listing.
+**Exception:** keep a command **only if** it carries non-obvious context (order matters, side effects, must-do-after). Example to keep: "After `bun db:push`, always run `bun db:apply-triggers` — drizzle-kit does not generate triggers." That's a gotcha, not a listing. Keep too, as written, the commands that verify work in this repo (test, typecheck, lint, how to run a single test): Claude needs them in every task, and a wrong guess runs the wrong suite. Cut the rest of the listing (install, dev, build, start).
 
 ## 4. Environment variable lists
 
@@ -113,13 +113,15 @@ level via JWT tokens. The database is accessed through a connection
 pool managed by the ORM layer. Background jobs are dispatched to ...
 ```
 
-**Exception:** if there's a **specific non-obvious decision** (e.g., "the API gateway intentionally does NOT proxy WebSocket connections — those go direct to the realtime service"), keep that as a gotcha. Cut the rest.
+**Exception:** if there's a **specific non-obvious decision** (e.g., "the API gateway intentionally does NOT proxy WebSocket connections — those go direct to the realtime service"), keep that as a gotcha. Keep too a line that says which package owns a feature when no package name says it. One line per such feature, never a system overview. Cut the rest.
 
 ## 6. Per-folder descriptions
 
 A table or list explaining what each folder/package does.
 
 **Why cut:** identical to directory trees — derivable from the structure and the contained code. The folder name usually does the work.
+
+**Exception:** the row whose folder name misleads. Keep that row as a one-liner.
 
 **Looks like:**
 
@@ -214,4 +216,4 @@ by the API layer. Sessions are stored in the database with a TTL of
 
 ## Summary heuristic
 
-Apply the canonical test from SKILL.md Phase 3 to any candidate line/section. If unsure, ask the user "did this line ever fix a real bug?" before cutting. If it survives, see `keep-criteria.md`.
+Apply the two tests from SKILL.md Phase 3 to any candidate line/section. If unsure, ask the user "did this line ever fix a real bug?" before cutting. If it survives, see `keep-criteria.md`.
