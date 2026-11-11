@@ -7,9 +7,11 @@
 #                         FREE and on mine=yes, 1 otherwise.
 #   preflight [DIR]       what this checkout needs before launch: run/todo/warn lines. warn served:
 #                         a listener already runs from DIR
-#   serve PORT [--dir DIR] [--mem SIZE] -- CMD
+#   serve PORT [--dir DIR] [--mem SIZE] [--swap SIZE] -- CMD
 #                         start CMD (one shell string) as the systemd user unit dev-up-PORT, logging
-#                         to PORT.log, and return: STARTED unit=dev-up-PORT log=FILE
+#                         to PORT.log, and return: STARTED unit=dev-up-PORT log=FILE. The unit gets
+#                         MemoryMax (default 4G, or DEV_UP_MEM) and MemorySwapMax (default 1G, or
+#                         DEV_UP_SWAP); --mem none lifts both
 #   wait PORT             READY http=N | HTTP_5XX http=N | DIED | BUSY_OTHER pid=N | BOUND_NO_HTTP | TIMEOUT
 #   watch PORT            the Monitor command: new error lines from the log, minus noise and excludes
 #   stop PORT [--force]   stop the unit serve started (systemd sends SIGKILL after 10 s), or an
@@ -163,11 +165,12 @@ cmd_preflight() {
 }
 
 cmd_serve() {
-  local port="$1" dir="$PWD" mem=""; shift
+  local port="$1" dir="$PWD" mem="${DEV_UP_MEM:-4G}" swap="${DEV_UP_SWAP:-1G}"; shift
   while [ $# -gt 0 ]; do
     case "$1" in
       --dir) dir="${2:-}"; shift 2 ;;
       --mem) mem="${2:-}"; shift 2 ;;
+      --swap) swap="${2:-}"; shift 2 ;;
       --) shift; break ;;
       *) die 2 "serve: unknown argument '$1' (the command goes after --)" ;;
     esac
@@ -189,7 +192,10 @@ cmd_serve() {
   # unit's transient file under /run/user, readable only by this user.
   local -a env=() props=(-p TimeoutStopSec=10)
   for v in $(compgen -e); do env+=(--setenv="$v"); done
-  [ -n "$mem" ] && props+=(-p "MemoryMax=$mem")
+  # Capped by default: an uncapped dev server grew past 5 GiB of RAM and kept 2 to 3 GiB in swap
+  # (measured on two servers, 11 Nov 2026), and four of them left the machine without memory. With
+  # MemoryMax alone the server spills into swap without limit, so the swap gets its own ceiling.
+  [ -n "$mem" ] && [ "$mem" != none ] && props+=(-p "MemoryMax=$mem" -p "MemorySwapMax=$swap")
   # systemd expands ${VAR} and $$ in ExecStart before bash runs; $$ is its escape for a literal $.
   c="exec >>$(q "$log") 2>&1; $*"
   systemctl --user reset-failed "$(unit "$port")" 2>/dev/null

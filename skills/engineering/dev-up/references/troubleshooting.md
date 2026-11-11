@@ -44,8 +44,8 @@ dev-up-PORT` keeps the unit's exit reason after the unit is gone. Read it before
 - `oom-kill`, or `Killed` with nothing in the log: the kernel OOM killer, systemd-oomd, or the
   unit's own `MemoryMax`. The unit sits in the user manager's `app.slice`, which systemd-oomd
   watches under memory pressure, and it picks the heaviest unit there, often a large dev server.
-  Relaunch through Restart with `serve --mem 4G` so the cap applies to the server alone, or raise
-  the cap.
+  `serve` caps every unit at 4G of RAM and 1G of swap. Relaunch through Restart with a higher cap,
+  `serve --mem 6G --swap 2G`, and tell the user the server outgrew the default.
 - `SIGTERM` while a subagent was working: a delegate killed it by name. Tell delegates that start
   servers to launch through `serve` and stop with `stop <port>`, never `pkill -f`.
 - Relaunch only through `serve`. `nohup`, `setsid` and `disown` put the server outside the unit,

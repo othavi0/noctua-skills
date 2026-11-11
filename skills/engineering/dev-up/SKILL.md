@@ -101,7 +101,9 @@ command.
 
    `serve` starts the command as the systemd user unit `dev-up-PORT` with this shell's
    environment and returns `STARTED unit=dev-up-PORT log=FILE`. Claude Code's background-task
-   time limit and memory cleanup do not reach a unit. `--mem 4G` sets the unit's `MemoryMax`.
+   time limit and memory cleanup do not reach a unit. The unit is capped at 4G of RAM and 1G of
+   swap. `--mem SIZE` and `--swap SIZE` change the caps; `--mem none` lifts both, only when the
+   user asks.
    After editing `.env` this session, prefix the command with `set -a; . ./.env; set +a;`.
 5. Wait with a foreground Bash call and `timeout: 600000`: `wait PORT`. `READY` → step 3. Any other
    verdict (`DIED`, `HTTP_5XX`, `BUSY_OTHER`, `BOUND_NO_HTTP`, `TIMEOUT`) comes with the log tail:
