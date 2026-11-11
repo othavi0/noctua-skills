@@ -25,7 +25,9 @@ Read this when `wait` says anything but `READY`, the server dies, or the session
 ## The server went down with no error in the log
 
 `journalctl --user -u dev-up-PORT` keeps the unit's exit reason. `oom-kill`, or `Killed` with an
-empty log, is the OOM killer or systemd-oomd: Restart with `serve --mem 4G`. A `SIGTERM` while a
+empty log, is the unit's own cap (4G of RAM and 1G of swap by default), the OOM killer or
+systemd-oomd: Restart with a higher cap, `serve --mem 6G --swap 2G`, and tell the user the server
+outgrew the default. A `SIGTERM` while a
 subagent worked means it killed the server by name: delegates start servers through `serve` and
 stop them with `stop PORT`. Relaunch only through `serve`, so `stop`, `wait` and `owner` still see
 the server as this skill's.

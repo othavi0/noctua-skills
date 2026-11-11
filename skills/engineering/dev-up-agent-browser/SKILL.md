@@ -106,7 +106,9 @@ Done when `S state PORT show` prints this checkout's `dir`.
    When the `dev` script hardcodes a port, run its command with the number swapped and the env
    prefix kept. `package.json` stays as it is.
 4. `S serve PORT --dir <app dir> -- '<dev command>'` in a foreground Bash call. It starts the
-   systemd user unit `dev-up-PORT` with this shell's environment; `--mem 4G` caps its memory. After
+   systemd user unit `dev-up-PORT` with this shell's environment, capped at 4G of RAM and 1G of
+   swap. `--mem SIZE` and `--swap SIZE` change the caps; `--mem none` lifts both, only when the
+   user asks. After
    editing `.env` this session, prefix the command with `set -a; . ./.env; set +a;`.
 5. `S wait PORT` in a foreground Bash call with `timeout: 600000`.
 

@@ -5,6 +5,16 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `dev-up` e `dev-up-agent-browser`: o `serve` sobe toda unidade com teto de
+  4G de RAM (`MemoryMax`) e 1G de swap (`MemorySwapMax`). Antes o teto só
+  entrava com `--mem`, e só de RAM. Em 11 de novembro de 2026, dois servidores
+  `next dev` subidos sem `--mem` tinham `MemoryMax=infinity`, pico de 5,1 e 5,6
+  GiB de RAM e 2,9 e 2,3 GiB de swap cada, e a máquina de 15 GiB chegou a 20 GiB
+  de swap em uso. `--mem SIZE` e o novo `--swap SIZE` trocam os tetos,
+  `DEV_UP_MEM` e `DEV_UP_SWAP` trocam o padrão, e `--mem none` tira os dois. O
+  servidor que passa do teto morre sozinho, e o troubleshooting manda subir de
+  novo com teto maior.
+
 - `dev-up` e `dev-up-agent-browser`: a convenção do atalho mostra o caminho
   inteiro do script e manda nunca guardá-lo em variável. Nos transcripts de 14
   dias, 135 de 199 chamadas do `dev-up-agent-browser` e 27 do `dev-up` vieram

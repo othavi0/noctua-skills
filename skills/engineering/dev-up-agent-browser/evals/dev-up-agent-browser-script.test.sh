@@ -35,6 +35,7 @@ check "owner on a free port" "$("$DU" owner $P)" "FREE"
 out=$(PATH="$T/bin:$PATH" DEV_UP_PROBE=probe-xyz serve $P -- 'only-on-caller-path; only-in-node-modules; echo "probe=$DEV_UP_PROBE"; exec python3 -m http.server '$P 2>&1)
 check "serve returns once the unit runs" "$(printf '%s' "$out" | head -1)" "STARTED unit=dev-up-$P *"
 check "the server runs as a systemd user unit" "$(active $P)" "active"
+check "serve without --mem caps RAM at 4G and swap at 1G" "$(systemctl --user show -p MemoryMax -p MemorySwapMax --value "dev-up-$P" | tr '\n' ' ')" "4294967296 1073741824 "
 check "wait on a healthy server" "$("$DU" wait $P | head -1)" "READY http=200"
 check "the unit gets the caller's PATH, env and node_modules/.bin" "$(grep -E 'ok$|^probe=' "$DEV_UP_CACHE/$P.log" | tr '\n' ' ')" "caller-path-ok local-bin-ok probe=probe-xyz "
 check "owner names the listener pid and who started it" "$("$DU" owner $P)" "BUSY pid=$(pgrep -f "http.server $P" | head -1) cwd=$T/app mine=yes via=dev-up state=mine"
@@ -199,11 +200,16 @@ sleep 1; kill -TERM "$W2"; sleep 0.5
 check "a stopped watcher leaves no tail behind" "$(pgrep -f "tail -n 0 -F $DEV_UP_CACHE/$P.log" | wc -l)" "0"
 
 git -C "$T/app" worktree add -q .claude/worktrees/wt 2>/dev/null
-serve $P3 --dir "$T/app/.claude/worktrees/wt" --mem 64M -- "python3 -m http.server $P3" >/dev/null 2>&1
+serve $P3 --dir "$T/app/.claude/worktrees/wt" --mem 64M --swap 32M -- "python3 -m http.server $P3" >/dev/null 2>&1
 "$DU" wait $P3 >/dev/null
 check "a nested worktree is not this checkout" "$("$DU" owner $P3)" "*mine=worktree*"
 check "--mem becomes the unit's MemoryMax" "$(systemctl --user show -p MemoryMax --value "dev-up-$P3")" "67108864"
+check "--swap becomes the unit's MemorySwapMax" "$(systemctl --user show -p MemorySwapMax --value "dev-up-$P3")" "33554432"
 "$DU" state $P3 init >/dev/null; : >"$DEV_UP_CACHE/$P3.hookoff"; : >"$DEV_UP_CACHE/$P3.pid"
+"$DU" stop $P3 >/dev/null
+serve $P3 --mem none -- "python3 -m http.server $P3" >/dev/null 2>&1
+"$DU" wait $P3 >/dev/null
+check "--mem none lifts both ceilings" "$(systemctl --user show -p MemoryMax -p MemorySwapMax --value "dev-up-$P3" | tr '\n' ' ')" "infinity infinity "
 "$DU" stop $P3 >/dev/null
 "$DU" state $P3 rm
 check "state rm removes the hook offset and the legacy pid file" "$(ls "$DEV_UP_CACHE/$P3.hookoff" "$DEV_UP_CACHE/$P3.pid" 2>/dev/null)" ""
