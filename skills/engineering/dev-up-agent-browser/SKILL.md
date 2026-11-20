@@ -143,9 +143,10 @@ Done when `S state PORT show` prints `watcher_alive=yes`.
    `$(...)`; there, ask the user to log in.
 3. Smoke: `S ab PORT errors`, `S ab PORT console`, `S ab PORT network requests --filter /api` (or
    the app's data origin).
-4. Port in the title, so the dashboard and window lists name it: `S ab PORT eval '<script>'` with
-   `PORT` filled in, after every full page load (`open`, `back`, a login redirect, a link to
-   another document); a client-side route change keeps it:
+4. Port in the title, so the dashboard and window lists name it: `S ab PORT js '<script>'` with
+   `PORT` filled in (`js` runs agent-browser `eval`, a word a session isolated in a worktree
+   refuses), after every full page load (`open`, `back`, a login redirect, a link to another
+   document); a client-side route change keeps it:
 
    ```js
    (() => { const p = '[PORT] '; const fix = () => { if (!document.title.startsWith(p)) document.title = p + document.title.replace(/^\[\d+\] /, ''); }; window.__devUpTitle?.disconnect(); window.__devUpTitle = new MutationObserver(fix); window.__devUpTitle.observe(document.head ?? document.documentElement, {childList: true, subtree: true, characterData: true}); fix(); return document.title; })()

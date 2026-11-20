@@ -55,7 +55,9 @@ if command -v agent-browser >/dev/null; then
   ab click '#b' >/dev/null
   check "ab drives the page" "$(ab get text '#b')" "clicked"
   ab set viewport 390 844 >/dev/null
-  check "ab emulates the viewport" "$(ab eval 'window.innerWidth')" "390"
+  check "ab emulates the viewport" "$(ab js 'window.innerWidth')" "390"
+  check "ab js - reads the script from stdin" "$(printf 'window.innerWidth + 1' | ab js -)" "391"
+  check "ab eval still runs agent-browser eval" "$(ab eval 'window.innerWidth')" "390"
   check "every ab call reuses the browser open started" "$(bpid)" "$pid1"
   check "browser names the session, the mode and a live browser" "$("$DU" browser $P)" "mode=headless session=devup-$P *alive=yes"
   check "hide on a live headless session changes nothing" "$("$DU" hide $P)" "ALREADY mode=headless"
@@ -65,10 +67,10 @@ if command -v agent-browser >/dev/null; then
   check "a command on a closed session reopens it on the app" "$(ab get title)" "eval-page"
   export DEV_UP_AB_NOWINDOW=1
   "$DU" show $P >/dev/null
-  ab eval "document.cookie='sid=logado; path=/; max-age=3600'" >/dev/null
+  ab js "document.cookie='sid=logado; path=/; max-age=3600'" >/dev/null
   ab close >/dev/null
   "$DU" hide $P >/dev/null
-  check "hide after the window closed keeps the login" "$(ab eval 'document.cookie')" "*sid=logado*"
+  check "hide after the window closed keeps the login" "$(ab js 'document.cookie')" "*sid=logado*"
   unset DEV_UP_AB_NOWINDOW
   ab close >/dev/null
   rm -f "$T/app/index.html"
