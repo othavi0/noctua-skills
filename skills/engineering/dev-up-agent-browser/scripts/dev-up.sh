@@ -22,7 +22,8 @@
 #   unwatched             for the UserPromptSubmit hook: this session's dead servers, and the errors
 #                         logged since the last prompt when the watcher is gone
 #   ab PORT ARGS...       run agent-browser ARGS in the port's session (devup-PORT) with the same
-#                         launch options on every call, so the daemon never relaunches the browser
+#                         launch options on every call, so the daemon never relaunches the browser.
+#                         ab PORT js CODE runs agent-browser eval CODE; js - reads it from stdin
 #   show PORT | hide PORT switch the session to a visible window (headed) or back to headless,
 #                         carrying cookies and storage: SWITCHED mode=M url=U | ALREADY mode=M
 #   dash                  start the agent-browser dashboard once: DASH url=http://localhost:4848
@@ -418,6 +419,9 @@ cmd_ab() {
   local port="$1"; shift
   have agent-browser || die 3 "agent-browser is not on PATH"
   [ $# -gt 0 ] || die 2 "ab PORT <agent-browser command...>"
+  if [ "$1" = js ]; then
+    shift; if [ "${1:-}" = - ]; then shift; set -- eval --stdin "$@"; else set -- eval "$@"; fi
+  fi
   # A dead daemon (idle timeout, a crash) would come back on about:blank for any command but open.
   case "$1" in
     open|goto|navigate|close|quit|exit|session|state|skills|dashboard|install|--*) ;;

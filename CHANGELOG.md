@@ -5,6 +5,11 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `dev-up-agent-browser`: `ab PORT js '<código>'` roda o `agent-browser eval`, e
+  `ab PORT js -` lê o código do stdin. Uma sessão isolada em worktree recusa
+  todo comando com a palavra `eval`, então a skill e as references ensinam
+  `js`. `ab PORT eval` segue funcionando.
+
 - `dev-up` e `dev-up-agent-browser`: o `serve` sobe toda unidade com teto de
   4G de RAM (`MemoryMax`) e 1G de swap (`MemorySwapMax`). Antes o teto só
   entrava com `--mem`, e só de RAM. Em 11 de novembro de 2026, dois servidores

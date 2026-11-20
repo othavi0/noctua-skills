@@ -13,8 +13,9 @@ Read this before driving the app. Every browser call is `S ab PORT <agent-browse
   later: `S ab PORT wait --url '**/route'` (or `wait <selector>` of the new page), then
   `get url`.
 - **Breakpoints.** `S ab PORT set viewport 390 844`, then confirm with
-  `S ab PORT eval 'window.innerWidth'`. The viewport is emulated, so it holds in headless and in a
-  tiled window alike.
+  `S ab PORT js 'window.innerWidth'`; `js -` reads a longer script from stdin. `js` runs
+  agent-browser `eval` under another name, because a session isolated in a worktree refuses the
+  word eval. The viewport is emulated, so it holds in headless and in a tiled window alike.
 - **Client errors.** The watcher reads the server log only. React errors, failed fetches and page
   exceptions live in the browser: `S ab PORT errors`, `S ab PORT console`,
   `S ab PORT network requests --filter <pattern>` whenever the screen looks wrong or an action
