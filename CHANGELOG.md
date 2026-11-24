@@ -5,6 +5,20 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `nuvem`: o `fetch` baixa só os arquivos que a API marca `downloadable`. Os
+  12 "download(s) failed" e os curl 22 com 400 de 10 a 14 de novembro eram todos
+  o arquivo de apoio (`*-apoio.tar.gz`) que o próprio `start` envia. A API
+  lista esse arquivo na sessão e responde 400 `file_not_downloadable`, e o
+  filtro antigo pulava só o nome fixo `support.tar.gz`. O download que falha
+  agora diz o código HTTP, o endpoint e a mensagem da API. A listagem segue o
+  cursor `page`/`next_page` no lugar do `after_id`. O header perde o
+  `files-api-2025-04-14`: a Files API saiu do beta, e em 24 de novembro cada
+  GET do script deu o mesmo código com e sem ele. A cópia instalada já mandava só
+  `managed-agents-2026-04-01` desde 13 de novembro. O SKILL.md diz que o
+  `start` roda na sessão principal ou no coordenador do workflow, porque o
+  classificador do auto mode negou o `start` de um subagente 3 vezes em 14 de
+  novembro. Entra o `evals/nuvem-script.test.sh`, com um curl falso no PATH.
+
 - Saem as skills `mobile-up` e `claude-md-prune`, a pedido do dono. Nos
   transcripts de 10 a 24 de novembro a `mobile-up` não teve nenhum uso e a
   `claude-md-prune` só rodou neste repo. As `description` da `dev-up` e da
