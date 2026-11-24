@@ -8,13 +8,13 @@ HERE=$(cd "$(dirname "$0")/.." && pwd)
 DU="$HERE/scripts/dev-up.sh"
 T=$(mktemp -d); T=$(cd "$T" && pwd -P)
 export DEV_UP_CACHE="$T/cache" CLAUDE_CODE_SESSION_ID=session-a
-P=$((39000 + RANDOM % 20000)); P2=$((P + 1)); P3=$((P + 2))
+P=$((39000 + RANDOM % 20000)); P2=$((P + 1)); P3=$((P + 2)); P4=$((P + 3))
 fails=0
 check() { if [[ "$2" == $3 ]]; then echo "ok   $1"; else echo "FAIL $1: got '$2', want '$3'"; fails=$((fails + 1)); fi; }
 serve() { timeout 10 "$DU" serve "$@"; }
 active() { systemctl --user is-active "dev-up-$1" 2>/dev/null; }
 cleanup() {
-  for p in $P $P2 $P3; do
+  for p in $P $P2 $P3 $P4; do
     systemctl --user stop "dev-up-$p" 2>/dev/null; systemctl --user reset-failed "dev-up-$p" 2>/dev/null
     pkill -f "http.server $p" 2>/dev/null
   done
@@ -30,6 +30,9 @@ printf '#!/bin/sh\necho local-bin-ok\n' >"$T/app/node_modules/.bin/only-in-node-
 chmod +x "$T/bin/only-on-caller-path" "$T/app/node_modules/.bin/only-in-node-modules"
 
 check "owner on a free port" "$("$DU" owner $P)" "FREE"
+# A server that falls every 21 s must still end in DIED; it runs beside the rest of the suite.
+serve $P4 -- "echo up; sleep 20; exit 1" >/dev/null 2>&1
+( timeout 150 "$DU" wait $P4 | head -1 >"$T/slowfall" ) & SLOW=$!
 "$DU" state $P init >/dev/null
 # shellcheck disable=SC2016 # $DEV_UP_PROBE must expand inside the unit, not here
 out=$(PATH="$T/bin:$PATH" DEV_UP_PROBE=probe-xyz serve $P -- 'only-on-caller-path; only-in-node-modules; echo "probe=$DEV_UP_PROBE"; exec python3 -m http.server '$P 2>&1)
@@ -67,6 +70,12 @@ if command -v agent-browser >/dev/null; then
   check "ab eval still runs agent-browser eval" "$(ab eval 'window.innerWidth')" "390"
   ab screenshot "$T/shots/deep/x.png" >/dev/null
   check "ab screenshot creates the folder of its path" "$(ls "$T/shots/deep/x.png" 2>/dev/null)" "$T/shots/deep/x.png"
+  ab screenshot "$T/shotsU/X.PNG" >/dev/null
+  check "ab screenshot creates the folder for an upper-case extension" "$(ls "$T/shotsU/X.PNG" 2>/dev/null)" "$T/shotsU/X.PNG"
+  ab screenshot "text=eval/a.png" "$T/shots2/y.png" >/dev/null
+  ab screenshot "text=eval/b.png" >/dev/null
+  check "ab screenshot never creates a folder from a selector" "$(ls -d "$T/app/text=eval" 2>/dev/null)" ""
+  check "but still creates the folder of the path after it" "$(ls -d "$T/shots2" 2>/dev/null)" "$T/shots2"
   check "every ab call reuses the browser open started" "$(bpid)" "$pid1"
   check "browser names the session, the mode and a live browser" "$("$DU" browser $P)" "mode=headless session=devup-$P *alive=yes"
   check "hide on a live headless session changes nothing" "$("$DU" hide $P)" "ALREADY mode=headless"
@@ -199,11 +208,30 @@ serve $P -- "trap '' TERM; exec python3 -m http.server $P" >/dev/null 2>&1
 t0=$(date +%s); out=$("$DU" stop $P); t1=$(date +%s)
 check "stop kills a server that ignores SIGTERM within 15 s" "$out $((t1 - t0 <= 15))" "STOPPED 1"
 "$DU" state $P rm
+for code in 143 1; do
+  serve $P -- "trap 'exit $code' TERM; sleep 600 & wait" >/dev/null 2>&1
+  sleep 1; "$DU" stop $P >/dev/null
+  check "stop logs no fall when the server exits $code on SIGTERM" "$(grep -c '^dev-up:' "$DEV_UP_CACHE/$P.log")" "0"
+done
+
+# The second between a fall and its restart: the hook keeps quiet, and stop still stops.
+"$DU" state $P init >/dev/null
+serve $P -- "n=\$(cat '$T/r5b' 2>/dev/null || echo 0); echo \$((n + 1)) >'$T/r5b'; [ \$n -ge 1 ] || { sleep 0.5; exit 1; }; exec python3 -m http.server $P" >/dev/null 2>&1
+for _ in $(seq 100); do [ "$(systemctl --user show -p SubState --value "dev-up-$P")" = auto-restart ] && break; sleep 0.03; done
+out=$("$DU" unwatched)
+check "the hook never calls a server in its restart window down" "$(printf '%s' "$out" | grep -c 'is down')" "0"
+check "and keeps its state" "$("$DU" state $P get dir)" "$T/app"
+"$DU" wait $P >/dev/null; "$DU" stop $P >/dev/null
+serve $P -- "n=\$(cat '$T/r5c' 2>/dev/null || echo 0); echo \$((n + 1)) >'$T/r5c'; [ \$n -ge 1 ] || { sleep 0.5; exit 1; }; exec python3 -m http.server $P" >/dev/null 2>&1
+for _ in $(seq 100); do [ "$(systemctl --user show -p SubState --value "dev-up-$P")" = auto-restart ] && break; sleep 0.03; done
+"$DU" stop $P >/dev/null; sleep 2.5
+check "stop in the restart window stops the unit for good" "$(active $P),$("$DU" owner $P)" "inactive,FREE"
+"$DU" state $P rm
 
 "$DU" state $P init >/dev/null
 serve $P -- "echo starting; sleep 1; exit 1" >/dev/null 2>&1
 check "wait reports a death the log never names" "$("$DU" wait $P | head -1)" "DIED"
-check "a command that always fails is tried 3 times, each fall logged" "$(grep -c '^dev-up: server exited result=exit-code code=exited status=1$' "$DEV_UP_CACHE/$P.log")" "3"
+check "a command that always fails is tried 5 times, each fall logged" "$(grep -c '^dev-up: server exited result=exit-code code=exited status=1$' "$DEV_UP_CACHE/$P.log")" "5"
 check "unwatched names the cause of a dead server" "$("$DU" unwatched)" "*server on port $P is down*dev-up: server exited result=exit-code*"
 serve $P -- "echo '[0] tailwind exited with code 1'; sleep 1; exec python3 -m http.server $P" >/dev/null 2>&1
 check "wait ignores scary text from a live server" "$("$DU" wait $P | head -1)" "READY http=200"
@@ -218,6 +246,13 @@ check "and it never binds later" "$("$DU" owner $P)" "FREE"
 setsid "$DU" watch $P >/dev/null 2>&1 & W2=$!
 sleep 1; kill -TERM "$W2"; sleep 0.5
 check "a stopped watcher leaves no tail behind" "$(pgrep -f "tail -n 0 -F $DEV_UP_CACHE/$P.log" | wc -l)" "0"
+
+"$DU" state $P3 init >/dev/null
+serve $P3 -- "sleep 120" >/dev/null 2>&1
+sleep 1
+check "unwatched reports a running unit that never opened its port" "$("$DU" unwatched)" "*unit on port $P3 runs but nothing listens*"
+check "and keeps the state of a server that still runs" "$("$DU" state $P3 get dir)" "$T/app"
+"$DU" stop $P3 >/dev/null
 
 # next dev exits once with an upgrade notice outside a TTY and starts on the retry: the unit
 # comes back by itself, and the log and the watcher name the fall.
@@ -259,6 +294,10 @@ out=$("$DU" preflight "$T/app")
 check "preflight warns about the app origin" "$out" "*NEXTAUTH_URL expects port 3001*"
 check "preflight leaves local services alone" "$(printf '%s' "$out" | grep -c SUPABASE)" "0"
 check "preflight never prints a secret or a database url" "$(printf '%s' "$out" | grep -cE 'hunter2|DATABASE_URL')" "0"
+
+wait "$SLOW"
+check "a server that keeps falling every 21 s ends in DIED" "$(cat "$T/slowfall")" "DIED"
+check "after 5 starts" "$(grep -c '^dev-up: server exited' "$DEV_UP_CACHE/$P4.log")" "5"
 
 export HOME="$T/home"; unset DEV_UP_CACHE CLAUDE_CODE_SESSION_ID
 mkdir -p "$HOME"
