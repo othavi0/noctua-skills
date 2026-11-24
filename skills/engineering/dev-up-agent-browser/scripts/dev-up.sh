@@ -31,18 +31,31 @@
 # Only under dev-up-agent-browser (dev-up answers "unknown command"):
 #   ab PORT ARGS...       run agent-browser ARGS in the port's session (devup-PORT) with the same
 #                         launch options on every call, so the daemon never relaunches the browser.
+#                         A headless session shuts down after 30 min idle (DEV_UP_AB_IDLE changes it);
+#                         a visible window never does.
 #                         ab PORT js CODE runs agent-browser eval CODE; js - reads it from stdin.
 #                         ab PORT screenshot ... DIR/FILE.png creates DIR when the last argument is
 #                         an image path (any case), not a selector like text=a/b.png. Exits 3 when agent-browser
 #                         itself does not run
 #   show PORT | hide PORT switch the session to a visible window (headed) or back to headless,
-#                         carrying cookies and storage: SWITCHED mode=M url=U | ALREADY mode=M
+#                         carrying cookies and storage: SWITCHED mode=M url=U | ALREADY mode=M |
+#                         FAILED mode=M url=U, then agent-browser's reason and whether the server is down
+#   login PORT [USER]     run this repo's login recipe from the checkout root: LOGGED_IN user=U url=U |
+#                         LOGIN_FAILED exit=N | NO_RECIPE key=K file=F (exit 1)
+#   recipe [set 'CMD' [USER] | rm]
+#                         show, save or delete this repo's login recipe: RECIPE | SAVED | REMOVED |
+#                         NO_RECIPE key=K file=F. CMD is a project command that logs in without
+#                         printing the password; {port} and {user} stand for the port and the user
 #   dash                  start the agent-browser dashboard once: DASH url=http://localhost:4848
 #   browser PORT          the mode and executable the port's session uses
 #
 # Browsers: see headless_exe and headed_exe below. Every window gets --class=agent-browser, so a
 # window manager rule can keep it from taking focus. Profiles and saved logins live in
 # ~/.local/state/dev-up-ab.
+#
+# Login recipes live in ~/.config/dev-up-ab/logins (DEV_UP_AB_CONFIG, else XDG_CONFIG_HOME), one
+# file per repo, named after its origin URL (host/owner/repo), else its git common dir, so every
+# worktree and clone of a repo finds the same one. Lines: cmd=CMD and an optional user=DEFAULT.
 #
 # Files in ~/.cache/dev-up (dev-up) or ~/.cache/dev-up-ab (dev-up-agent-browser): PORT.log,
 # PORT.state (session dir watcher_task, plus tab_id or ab_mode), PORT.watch (watch), PORT.paused,
@@ -58,6 +71,7 @@ else
   SKILL=dev-up CACHE="${DEV_UP_CACHE:-$HOME/.cache/dev-up}" KEYS="session dir watcher_task tab_id"
 fi
 STATE_DIR="${DEV_UP_AB_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/dev-up-ab}"
+CONFIG_DIR="${DEV_UP_AB_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/dev-up-ab}"
 ERRORS='[Ee]rror|Exception|Traceback|Failed to compile|unhandled|ECONNREFUSED|EADDRINUSE|panic|FATAL|^dev-up: server exited'
 NOISE='NEXT_REDIRECT|PoolError|QueuePool limit|Too many connections|favicon\.ico|SIGTERM|terminated by signal|exit code 143|(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) [^ ]+( HTTP/[0-9.]+"?)? [23][0-9][0-9]([^0-9]|$)'
 
@@ -461,8 +475,11 @@ ab_env() {
   [ "${DEV_UP_AB_NOWINDOW:-}" = 1 ] && unset AGENT_BROWSER_HEADED
   if [ -n "$exe" ]; then export AGENT_BROWSER_EXECUTABLE_PATH="$exe"; else unset AGENT_BROWSER_EXECUTABLE_PATH; fi
 }
+# A headless session closes after DEV_UP_AB_IDLE (default 30m) idle. A visible window is the user's
+# and stays: 0 turns the timeout off. The daemon applies a changed value in place, without a relaunch.
+ab_idle() { if [ "$(ab_mode "$1")" = headed ]; then say 0; else say "${DEV_UP_AB_IDLE:-30m}"; fi; }
 cmd_ab() {
-  local port="$1" list a shot="" skip=""; shift
+  local port="$1" list a shot="" skip="" idle; shift
   have agent-browser || die 3 "agent-browser is not on PATH"
   [ $# -gt 0 ] || die 2 "ab PORT <agent-browser command...>"
   # A version manager's shim with no binary behind it passes have and fails every call.
@@ -485,18 +502,19 @@ cmd_ab() {
       */*.png|*/*.jpg|*/*.jpeg|*/*.webp) mkdir -p "$(dirname "$shot")" ;;
     esac
   fi
+  idle=$(ab_idle "$port")
   # A dead daemon (idle timeout, a crash) would come back on about:blank for any command but open.
   case "$1" in
     open|goto|navigate|close|quit|exit|session|state|skills|dashboard|install|--*) ;;
     *) if ! say "$list" | grep -qw -- "$(ab_session "$port")"; then
          say "dev-up: the session on port $port had closed; reopened it at http://localhost:$port/" >&2
-         ( ab_env "$port"; agent-browser --idle-timeout 30m open "http://localhost:$port/" >/dev/null 2>&1 )
+         ( ab_env "$port"; agent-browser --idle-timeout "$idle" open "http://localhost:$port/" >/dev/null 2>&1 )
        fi ;;
   esac
-  ( ab_env "$port"; exec agent-browser --idle-timeout 30m "$@" )
+  ( ab_env "$port"; exec agent-browser --idle-timeout "$idle" "$@" )
 }
 cmd_switch() {
-  local port="$1" want="$2" url="" auth
+  local port="$1" want="$2" url="" auth out
   [ "$(ab_mode "$port")" = "$want" ] && ab_alive "$port" && { say "ALREADY mode=$want"; return 0; }
   auth="$STATE_DIR/auth-$port.json"
   if ab_alive "$port"; then
@@ -515,11 +533,70 @@ cmd_switch() {
   [ -f "$(f "$port" state)" ] || state_write "$port" "session=$(session_id)" "dir=$(toplevel "$PWD")"
   state_write "$port" "ab_mode=$want"
   # --state cannot go with --profile ("Cannot use storage_state with profile"): open, load, reopen.
-  cmd_ab "$port" open "$url" >/dev/null 2>&1 || { say "FAILED mode=$want url=$url"; return 1; }
+  # A failed open can still have launched the window: on 17 Nov a show failed on a server that had
+  # just been oom-killed. Name agent-browser's reason and a dead server, never just FAILED.
+  if ! out=$(cmd_ab "$port" open "$url" 2>&1); then
+    say "FAILED mode=$want url=$url"
+    say "$out" | grep -v '^⚠' | tail -2
+    bound "$port" || say "nothing listens on port $port: the server is down; bring it back, then show again"
+    return 1
+  fi
   if [ -s "$auth" ]; then
     cmd_ab "$port" state load "$auth" >/dev/null 2>&1 && cmd_ab "$port" open "$url" >/dev/null 2>&1
   fi
   say "SWITCHED mode=$want url=$url"
+}
+# The login recipe of the repo this checkout belongs to. Its key is the same in every worktree and
+# clone: the origin URL as host/owner/repo, else the git common dir.
+repo_key() {
+  local top url; top=$(toplevel "$PWD")
+  url=$(git -C "$top" config --get remote.origin.url 2>/dev/null)
+  if [ -n "$url" ]; then
+    url=${url%/}; url=${url%.git}; url=${url#*://}; url=${url#*@}
+    case "$url" in *:*) case "${url%%:*}" in */*) ;; *) url="${url%%:*}/${url#*:}" ;; esac ;; esac
+    say "$url" | tr '[:upper:]' '[:lower:]'
+  else
+    say "local$(common_dir "$top" || say "$top")"
+  fi
+}
+recipe_file() { local k; k=$(repo_key); say "$CONFIG_DIR/logins/$(printf '%s' "$k" | tr -c 'A-Za-z0-9._-' '_')"; }
+recipe_get() { sed -n "s/^$1=//p" "$(recipe_file)" 2>/dev/null | tail -1; }
+no_recipe() { say "NO_RECIPE key=$(repo_key) file=$(recipe_file)"; return 1; }
+cmd_recipe() {
+  local op="${1:-show}" rf; rf=$(recipe_file)
+  case "$op" in
+    show) [ -s "$rf" ] || { no_recipe; return; }
+      say "RECIPE key=$(repo_key) file=$rf"; grep -v '^#' "$rf" ;;
+    set)
+      local c="${2:-}" u="${3:-}"
+      [ -n "$c" ] || die 2 "recipe set 'CMD' [USER]: CMD logs in on {port} without printing the password"
+      case "$c" in *'{port}'*) ;; *) die 2 "the recipe must take the port as {port}" ;; esac
+      case "$c$u" in *[[:cntrl:]]*) die 2 "the recipe is one line" ;; esac
+      # A recipe names a command; the password stays in the project's own ignored file.
+      say "$c" | grep -qiE 'pass(word)?=|senha=|--password[= ]' && die 3 "the recipe holds no password; point it at a command that reads the project's own file"
+      mkdir -p "$CONFIG_DIR/logins" && chmod 700 "$CONFIG_DIR"
+      { say "# dev-up-agent-browser login recipe for $(repo_key)"; say "cmd=$c"; [ -n "$u" ] && say "user=$u"; } >"$rf"
+      chmod 600 "$rf"
+      say "SAVED key=$(repo_key) file=$rf" ;;
+    rm) rm -f "$rf"; say "REMOVED key=$(repo_key)" ;;
+    *) die 2 "recipe: unknown op '$op' (show, set, rm)" ;;
+  esac
+}
+cmd_login() {
+  local port="$1" user="${2:-}" c out rc url qu
+  c=$(recipe_get cmd)
+  [ -n "$c" ] || { no_recipe; say "No recipe: ask the user to log in in the window, and offer to save one"; return 1; }
+  [ -n "$user" ] || user=$(recipe_get user)
+  case "$c" in *'{user}'*) [ -n "$user" ] || die 2 "login PORT USER: the recipe takes {user} and names no default" ;; esac
+  # Quoted, so an & in the user stays a character (bash 5.2 expands it in a bare replacement).
+  qu=$(q "$user"); c=${c//\{port\}/$port}; c=${c//\{user\}/"$qu"}
+  ab_alive "$port" || cmd_ab "$port" open "http://localhost:$port/" >/dev/null 2>&1
+  # The recipe's own agent-browser calls inherit the port's session, profile and executable.
+  out=$(ab_env "$port"; cd "$(toplevel "$PWD")" && bash -c "$c" </dev/null 2>&1); rc=$?
+  if [ "$rc" -ne 0 ]; then say "LOGIN_FAILED exit=$rc"; say "$out" | tail -5; return 1; fi
+  url=$(cmd_ab "$port" get url 2>/dev/null | tail -1)
+  say "LOGGED_IN user=${user:-?} url=$url"
+  say "$out" | tail -3
 }
 cmd_dash() {
   local port="${DEV_UP_AB_DASH_PORT:-4848}"
@@ -539,7 +616,7 @@ if [ "$SKILL" = dev-up ]; then
   esac
 fi
 case "$cmd" in
-  owner|serve|wait|logs|watch|stop|state|ab|show|hide|browser) need_port "${1:-}" ;;
+  owner|serve|wait|logs|watch|stop|state|ab|show|hide|browser|login) need_port "${1:-}" ;;
 esac
 case "$cmd" in
   owner) cmd_owner "$1" ;;
@@ -555,6 +632,8 @@ case "$cmd" in
   ab) cmd_ab "$@" ;;
   show) cmd_switch "$1" headed ;;
   hide) cmd_switch "$1" headless ;;
+  login) cmd_login "$@" ;;
+  recipe) cmd_recipe "$@" ;;
   dash) cmd_dash ;;
   browser) cmd_browser "$1" ;;
   -h|--help|help|'') usage ;;

@@ -48,9 +48,17 @@ the server as this skill's.
 - `ERROR: agent-browser is on PATH but does not run`: the `ab` exit code is 3, and the line
   quotes the binary's own error. A version manager shim with no version installed is the usual
   cause; install agent-browser again and retry.
-- `dev-up: the session on port PORT had closed; reopened it at ...` on stderr: the daemon stopped
-  after 30 minutes idle, and `ab` reopened the session at the root with the same profile, so the
-  login stays. Navigate back to the route you were on before acting.
+- `dev-up: the session on port PORT had closed; reopened it at ...` on stderr: a headless session
+  stopped after 30 minutes idle (a visible window has no idle timeout, so there the window was
+  closed by hand or crashed), and `ab` reopened the session at the root with the same profile, so
+  the login stays. Navigate back to the route you were on before acting.
+- `show` prints `FAILED mode=M url=U`: the next line is agent-browser's reason. With
+  `nothing listens on port PORT` the server fell (the browser itself may have opened); bring the
+  server back and run `show` again. `SingletonLock: File exists` means another browser still holds
+  the `PORT-headed` profile: find it with `pgrep -af user-data-dir=.*PORT-headed` and tell the user.
+- `LOGIN_FAILED exit=127` with "No such file or directory": the recipe's command is missing from
+  this checkout; `login` runs it from the root of the checkout you are in, so a worktree needs the
+  same file. Other exit codes: the recipe's last lines say why.
 - `Cannot use storage_state with profile`: `--state` went together with a profile. Open first,
   then `S ab PORT state load <file>`, then open again; `show` and `hide` do exactly that.
 - `S browser PORT` shows a full browser where `chrome-headless-shell` used to run: a cache cleaner

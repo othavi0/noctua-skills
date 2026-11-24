@@ -7,6 +7,8 @@
   {"query": "roda o dev server na 3001 e me deixa ver a sessão do agente no dashboard", "should_trigger": true},
   {"query": "serve the app on 9000 and click through the signup flow with agent-browser", "should_trigger": true},
   {"query": "sobe o servidor e abre uma janela visível do agent-browser para eu logar", "should_trigger": true},
+  {"query": "/dev-up-agent-browser 3005 abre visualmente e loga com admin", "should_trigger": true},
+  {"query": "loga com o usuário de teste admin no app local da porta 3000 e me mostra a janela", "should_trigger": true},
   {"query": "/dev-up 3000", "should_trigger": false},
   {"query": "open the app in my Chrome tab with Claude in Chrome on port 5000", "should_trigger": false},
   {"query": "sobe o app Expo no emulador Android, preciso testar no celular", "should_trigger": false},
