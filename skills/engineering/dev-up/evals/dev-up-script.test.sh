@@ -118,7 +118,7 @@ serve $P -- "python3 -m http.server $P" >/dev/null 2>&1
 check "stop frees the server serve started" "$("$DU" stop $P)" "STOPPED"
 check "stop removes the unit" "$(active $P)" "inactive"
 : >"$DEV_UP_CACHE/$P.pid"
-check "unwatched reports a dead server once" "$("$DU" unwatched)" "*server on port $P is down*"
+check "unwatched reports a dead server once, naming this skill" "$("$DU" unwatched)" "*server on port $P is down*run /dev-up $P to bring it back*"
 check "and then clears its state" "$("$DU" unwatched)" ""
 check "the server-down branch removes the hook offset and the legacy pid file" "$(ls "$DEV_UP_CACHE/$P.hookoff" "$DEV_UP_CACHE/$P.state" "$DEV_UP_CACHE/$P.pid" 2>/dev/null)" ""
 

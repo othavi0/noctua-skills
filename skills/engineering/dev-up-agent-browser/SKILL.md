@@ -148,7 +148,8 @@ Done when `S state PORT show` prints `watcher_alive=yes`.
 1. Visible: `S show PORT`. Headless: `S ab PORT open http://localhost:PORT/`. `show` prints
    `SWITCHED`, or `FAILED` followed by agent-browser's reason; with `nothing listens on port PORT`
    the server fell: back to step 1, then `S show PORT` again. The visible window never closes while
-   idle; a headless session closes after 30 minutes idle and `ab` reopens it on the next call.
+   idle; a headless session closes after 30 minutes idle and `ab` reopens it on the next call, on
+   the last page it showed, without the query string.
 2. `S ab PORT get url`. On a login route (`/login`, `/auth`, `/sign-in`, `/entrar`, `/acesso`,
    `/conta`), when the user asked to log in or the task needs a logged-in page:
    - `S login PORT [USER]` runs this repo's login recipe from the root of the current checkout.

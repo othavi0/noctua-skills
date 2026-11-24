@@ -50,8 +50,9 @@ the server as this skill's.
   cause; install agent-browser again and retry.
 - `dev-up: the session on port PORT had closed; reopened it at ...` on stderr: a headless session
   stopped after 30 minutes idle (a visible window has no idle timeout, so there the window was
-  closed by hand or crashed), and `ab` reopened the session at the root with the same profile, so
-  the login stays. Navigate back to the route you were on before acting.
+  closed by hand or crashed), and `ab` reopened the session on the last page it showed, with the
+  same profile, so the login stays. agent-browser keeps that URL without its query string: when
+  the route needs one (`?id=3`), open the full URL again before acting.
 - `show` prints `FAILED mode=M url=U`: the next line is agent-browser's reason. With
   `nothing listens on port PORT` the server fell (the browser itself may have opened); bring the
   server back and run `show` again. `SingletonLock: File exists` means another browser still holds
