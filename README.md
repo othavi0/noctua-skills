@@ -2,14 +2,15 @@
 
 [![skills.sh](https://skills.sh/b/othavi0/noctua-skills)](https://skills.sh/othavi0/noctua-skills)
 
-Six Claude Code skills I use every day, packaged to drop into any project. Each
+Four Claude Code skills I use every day, packaged to drop into any project. Each
 one started as a bug I hit twice, and gets cut the moment it stops earning its
 place.
 
 A skill is a folder with a `SKILL.md`: YAML frontmatter plus instructions. Claude
 Code reads the `description` to decide when to reach for it; the body guides the
 run. Heavier material loads on demand from `references/`, so the trigger stays
-cheap. Fork them and rename them. Nothing here depends on the folder name.
+cheap. Fork them. `dev-up` and `dev-up-agent-browser` read their own folder name to pick
+their cache, so keep those two names.
 
 ## Quickstart
 
@@ -24,9 +25,9 @@ Claude Code.
 Prefer to install by hand? Clone the repo and copy a skill folder into
 `~/.claude/skills` (global) or `.claude/skills` (one project).
 
-`dev-up`, `dev-up-agent-browser`, `nuvem` and `claude-md-prune` are model-invoked. Type them as a slash command
+`dev-up`, `dev-up-agent-browser` and `nuvem` are model-invoked. Type them as a slash command
 (`/dev-up 3000`) or let Claude reach for them when the task fits the description.
-`mobile-up` and `humanize-pt-br` run only when you type them.
+`humanize-pt-br` runs only when you type it.
 
 ## Engineering
 
@@ -55,21 +56,6 @@ relaunches the browser whenever two calls disagree on their launch options, and
 the window that comes back steals your focus. On Hyprland, one window rule
 keeps the visible window from ever pulling you to its workspace.
 
-**[mobile-up](./skills/engineering/mobile-up/SKILL.md)** exists because an Expo
-app needs three things up at once and each one lies in its own way. The dev
-server, Metro and the Android emulator all report "running" long before the
-phone can use them: the app's env still says `localhost`, the port in LISTEN
-belongs to another worktree, the bundle on air was built with yesterday's URL,
-the emulator is showing someone else's session. One command brings the three up,
-writes the machine's LAN IP into the app's env, waits for each piece to answer,
-opens the app with a fresh bundle and waits for Metro to confirm delivery when
-it can read Metro's log. The app opens in Expo Go, or in the project's
-development build when the app depends on `expo-dev-client`. A port held by another checkout sends the skill to the
-next free one, and it never kills a process it did not start. The evidence goes
-into a question for you. Ten symptoms a device can show map to one check and
-one fix each. When none matches, the skill stops and asks you for the error
-text. Linux host, Android SDK for the emulator. iOS is out of scope.
-
 **[nuvem](./skills/engineering/nuvem/SKILL.md)** exists because a build, an E2E
 run and a before-and-after measurement do not fit on a laptop that is also running
 everything else. It sends the task to a Claude Managed Agents session paid by the
@@ -81,14 +67,6 @@ the Console spend limit. If it cannot read the spend, it refuses too. Per-repo
 notes in `~/.config/nuvem/` record how to get each project running in a bare
 container and every gate the local pipeline checks that the container cannot see,
 so the next patch does not pass there and fail here. Linux, an API key, `curl` and `jq`.
-
-**[claude-md-prune](./skills/engineering/claude-md-prune/SKILL.md)** runs because
-`CLAUDE.md` bloats into noise. Project memory grows by accretion: paths that moved,
-commands that changed, advice the code already enforces. The skill asks two
-questions of every line: would Claude make a mistake without it, and would Claude
-spend many tool calls finding it again in every session. A line that fails both
-goes. The skill also flags the lines that drifted out of sync with the code, and
-covers `.claude/rules/` and `@path` imports along with `CLAUDE.md`.
 
 ## Writing
 
