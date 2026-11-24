@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# dev-up: the mechanical half of the dev-up skill. One dev server per port, one log, one state file.
+# dev-up.sh: the mechanical half of the dev-up and dev-up-agent-browser skills. One dev server per
+# port, one log, one state file; under dev-up-agent-browser, also one agent-browser session per
+# port. Both skills ship this same file, byte for byte. It reads which skill it serves from the
+# folder above scripts/ (symlinks resolved), so each skill keeps its own cache and state keys, and
+# both run side by side.
 #
 # Usage: dev-up.sh <command> [PORT] [args]
 #   owner PORT            FREE | BUSY pid=N cwd=DIR mine=yes|worktree|orphan|no|? via=dev-up|other
@@ -11,24 +15,50 @@
 #                         start CMD (one shell string) as the systemd user unit dev-up-PORT, logging
 #                         to PORT.log, and return: STARTED unit=dev-up-PORT log=FILE. The unit gets
 #                         MemoryMax (default 4G, or DEV_UP_MEM) and MemorySwapMax (default 1G, or
-#                         DEV_UP_SWAP); --mem none lifts both
+#                         DEV_UP_SWAP); --mem none lifts both. A server that exits with a failure
+#                         (an error exit, oom-kill) starts again after 1 s, at most 5 starts in
+#                         10 minutes; each fall logs "dev-up: server exited result=R code=C status=S".
+#                         A stop logs nothing
 #   wait PORT             READY http=N | HTTP_5XX http=N | DIED | BUSY_OTHER pid=N | BOUND_NO_HTTP | TIMEOUT
-#   watch PORT            the Monitor command: new error lines from the log, minus noise and excludes
+#   logs PORT [N]         the last N lines of PORT.log (default 40)
+#   watch PORT            the Monitor command: new error lines from the log, minus noise and excludes,
+#                         and every "dev-up: server exited" line
 #   stop PORT [--force]   stop the unit serve started (systemd sends SIGKILL after 10 s), or an
 #                         orphan listener: STOPPED | STILL_BOUND. --force: any listener
-#   state PORT init | show | get KEY | set KEY=VALUE... | pause | exclude 'TEXT' | rm
+#   state PORT init | show | get KEY | set KEY=VALUE... | pause | resume | exclude 'TEXT' | rm
 #   unwatched             for the UserPromptSubmit hook: this session's dead servers, and the errors
 #                         logged since the last prompt when the watcher is gone
+# Only under dev-up-agent-browser (dev-up answers "unknown command"):
+#   ab PORT ARGS...       run agent-browser ARGS in the port's session (devup-PORT) with the same
+#                         launch options on every call, so the daemon never relaunches the browser.
+#                         ab PORT js CODE runs agent-browser eval CODE; js - reads it from stdin.
+#                         ab PORT screenshot ... DIR/FILE.png creates DIR when the last argument is
+#                         an image path (any case), not a selector like text=a/b.png. Exits 3 when agent-browser
+#                         itself does not run
+#   show PORT | hide PORT switch the session to a visible window (headed) or back to headless,
+#                         carrying cookies and storage: SWITCHED mode=M url=U | ALREADY mode=M
+#   dash                  start the agent-browser dashboard once: DASH url=http://localhost:4848
+#   browser PORT          the mode and executable the port's session uses
 #
-# Files in ~/.cache/dev-up: PORT.log, PORT.state (session dir watcher_task tab_id), PORT.watch
-# (watch), PORT.paused, PORT.exclude (fixed strings, one per line), PORT.hookoff (log offset at
-# the last prompt).
+# Browsers: see headless_exe and headed_exe below. Every window gets --class=agent-browser, so a
+# window manager rule can keep it from taking focus. Profiles and saved logins live in
+# ~/.local/state/dev-up-ab.
+#
+# Files in ~/.cache/dev-up (dev-up) or ~/.cache/dev-up-ab (dev-up-agent-browser): PORT.log,
+# PORT.state (session dir watcher_task, plus tab_id or ab_mode), PORT.watch (watch), PORT.paused,
+# PORT.exclude (fixed strings, one per line), PORT.hookoff (log offset at the last prompt).
 # Exit codes: 0 ok, 1 negative verdict, 2 usage, 3 refused.
 set -uo pipefail
 
-CACHE="${DEV_UP_CACHE:-$HOME/.cache/dev-up}"
-KEYS="session dir watcher_task tab_id"
-ERRORS='[Ee]rror|Exception|Traceback|Failed to compile|unhandled|ECONNREFUSED|EADDRINUSE|panic|FATAL'
+SELF=$(readlink -f "$0" 2>/dev/null)
+SKILL=$(basename "$(dirname "$(dirname "${SELF:-$0}")")")
+if [ "$SKILL" = dev-up-agent-browser ]; then
+  CACHE="${DEV_UP_CACHE:-$HOME/.cache/dev-up-ab}" KEYS="session dir watcher_task ab_mode"
+else
+  SKILL=dev-up CACHE="${DEV_UP_CACHE:-$HOME/.cache/dev-up}" KEYS="session dir watcher_task tab_id"
+fi
+STATE_DIR="${DEV_UP_AB_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/dev-up-ab}"
+ERRORS='[Ee]rror|Exception|Traceback|Failed to compile|unhandled|ECONNREFUSED|EADDRINUSE|panic|FATAL|^dev-up: server exited'
 NOISE='NEXT_REDIRECT|PoolError|QueuePool limit|Too many connections|favicon\.ico|SIGTERM|terminated by signal|exit code 143|(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) [^ ]+( HTTP/[0-9.]+"?)? [23][0-9][0-9]([^0-9]|$)'
 
 say() { printf '%s\n' "$*"; }
@@ -57,7 +87,20 @@ listener_pid() {
 }
 
 unit() { say "dev-up-$1"; }
-served() { systemctl --user is-active --quiet "$(unit "$1")" 2>/dev/null; }
+# Alive includes the second between a fall and its restart (activating/auto-restart).
+served() {
+  case "$(systemctl --user show -p ActiveState --value "$(unit "$1")" 2>/dev/null)" in
+    active|activating|deactivating|reloading|refreshing) return 0 ;;
+  esac
+  return 1
+}
+restarting() {
+  case "$(systemctl --user show -p ActiveState -p SubState --value "$(unit "$1")" 2>/dev/null | tr '\n' /)" in
+    */auto-restart*|deactivating/*) return 0 ;;
+  esac
+  return 1
+}
+last_fall() { grep '^dev-up: server exited' "$(f "$1" log)" 2>/dev/null | tail -1; }
 in_unit() { [ -n "${1:-}" ] && grep -qE "/$(unit "$2")\.service\$" "/proc/$1/cgroup" 2>/dev/null; }
 orphan() { case "$1" in *' (deleted)') [ ! -d "$1" ]; return ;; esac; return 1; }
 
@@ -82,7 +125,7 @@ state_owner() {
   elif [ -n "$s" ] && [ "$s" = "$(session_id)" ]; then say mine
   else say other; fi
 }
-via() { in_unit "$1" "$2" && say dev-up || say other; }
+via() { if in_unit "$1" "$2"; then say dev-up; else say other; fi; }
 
 cmd_owner() {
   local port="$1" pid cwd here mine=no
@@ -190,8 +233,17 @@ cmd_serve() {
   # A service unit starts from the user manager's environment, not this shell's: copy every
   # exported variable by name. Values stay off the command line; systemd keeps them in the
   # unit's transient file under /run/user, readable only by this user.
-  local -a env=() props=(-p TimeoutStopSec=10)
+  # next dev exits 1 to show an upgrade notice when it sees an agent in the environment (CLAUDECODE,
+  # AI_AGENT, which this unit inherits) and starts on the retry; an oom-kill
+  # used to leave the port dead. Both come back; a server that falls 5 times in 10 minutes, fast
+  # or slow, stays down. ExecStopPost logs why each run ended, except a clean exit and a stop
+  # (cmd_stop leaves PORT.stopping while it runs).
+  local -a env=() props=(-p TimeoutStopSec=10 -p Restart=on-failure -p RestartSec=1
+    -p StartLimitIntervalSec=600 -p StartLimitBurst=5
+    -p "ExecStopPost=$(command -v bash) -c '[ \"\$\$SERVICE_RESULT\" = success ] || [ -e \"\$\$DEV_UP_STOPPING\" ] || echo \"dev-up: server exited result=\$\$SERVICE_RESULT code=\$\$EXIT_CODE status=\$\$EXIT_STATUS\" >>\"\$\$DEV_UP_LOG\"'")
   for v in $(compgen -e); do env+=(--setenv="$v"); done
+  env+=(--setenv="DEV_UP_LOG=$log" --setenv="DEV_UP_STOPPING=$(f "$port" stopping)")
+  rm -f "$(f "$port" stopping)"
   # Capped by default: an uncapped dev server grew past 5 GiB of RAM and kept 2 to 3 GiB in swap
   # (measured on two servers, 11 Nov 2026), and four of them left the machine without memory. With
   # MemoryMax alone the server spills into swap without limit, so the swap gets its own ceiling.
@@ -260,7 +312,9 @@ cmd_stop() {
   lp=$(listener_pid "$port")
   [ -n "$lp" ] && cwd=$(proc_cwd "$lp")
   if served "$port" && { [ -z "$lp" ] || in_unit "$lp" "$port"; }; then
+    : >"$(f "$port" stopping)"
     systemctl --user stop "$(unit "$port")" 2>/dev/null
+    rm -f "$(f "$port" stopping)"
   elif orphan "$cwd" || [ "$force" = --force ]; then
     [ -n "$lp" ] || die 3 "cannot see the listener's pid (another user's process?)"
     for p in $(tree "$lp"); do kill -TERM "$p" 2>/dev/null; done
@@ -315,6 +369,7 @@ cmd_state() {
       local kv; for kv in "$@"; do check_kv "$kv"; done
       state_write "$port" "$@" ;;
     pause) : >"$(f "$port" paused)"; say "paused: the hook stays quiet until watch runs again" ;;
+    resume) rm -f "$(f "$port" paused)"; say "resumed: the hook reports new errors again" ;;
     exclude)
       local text="${1:?state PORT exclude 'TEXT'}" exc; exc=$(f "$port" exclude)
       [ "${#text}" -ge 4 ] || die 2 "exclude takes a literal piece of the log line, at least 4 characters"
@@ -325,6 +380,7 @@ cmd_state() {
       cat "$sf"
       local wp; wp=$(cat "$(f "$port" watch)" 2>/dev/null)
       say "server_alive=$(served "$port" && echo yes || echo no) watcher_alive=$(alive "$wp" && echo yes || echo no) paused=$([ -f "$(f "$port" paused)" ] && echo yes || echo no)"
+      [ "$SKILL" = dev-up-agent-browser ] && say "browser_alive=$(ab_alive "$port" && echo yes || echo no) mode=$(ab_mode "$port") session=$(ab_session "$port")"
       [ -s "$(f "$port" exclude)" ] && sed 's/^/excluded: /' "$(f "$port" exclude)"
       return 0 ;;
     rm) rm -f "$sf" "$(f "$port" watch)" "$(f "$port" paused)" "$(f "$port" exclude)" "$(f "$port" hookoff)" "$(f "$port" pid)" ;;
@@ -344,8 +400,12 @@ cmd_unwatched() {
     port=$(basename "$sf" .state)
     [ "$(state_get "$port" session)" = "$sid" ] || continue
     wp=$(cat "$(f "$port" watch)" 2>/dev/null)
-    if ! bound "$port"; then
+    if bound "$port" || restarting "$port"; then :
+    elif served "$port"; then
+      say "dev-up: the unit on port $port runs but nothing listens on the port (log: $(f "$port" log))."
+    else
       say "dev-up: the server on port $port is down (log: $(f "$port" log)). Its state is cleared; run /dev-up $port to bring it back."
+      last_fall "$port"
       rm -f "$sf" "$(f "$port" watch)" "$(f "$port" paused)" "$(f "$port" hookoff)" "$(f "$port" pid)"
       continue
     fi
@@ -363,22 +423,140 @@ cmd_unwatched() {
   return 0
 }
 
+# agent-browser keeps one daemon per session and relaunches the browser when a call's launch options
+# differ from the running ones (measured: a call without --args reopened Brave without its class;
+# one without --executable-path fell back to the env's browser on about:blank). Every call goes
+# through ab_env, so each one carries the same options.
+ab_session() { say "devup-$1"; }
+ab_mode() { local m; m=$(state_get "$1" ab_mode); say "${m:-headless}"; }
+ab_alive() { agent-browser session list 2>/dev/null | grep -qw -- "$(ab_session "$1")"; }
+# Headless: DEV_UP_AB_HEADLESS, else the newest Playwright chrome-headless-shell (about half the RAM
+# of a full browser per session), else the env's AGENT_BROWSER_EXECUTABLE_PATH, else agent-browser's
+# own Chrome. Headed: DEV_UP_AB_HEADED, else the env's browser, else agent-browser's Chrome.
+headless_exe() {
+  local base hs
+  [ -n "${DEV_UP_AB_HEADLESS:-}" ] && { say "$DEV_UP_AB_HEADLESS"; return; }
+  for base in "${PLAYWRIGHT_BROWSERS_PATH:-}" "$HOME/.cache/ms-playwright"; do
+    [ -n "$base" ] || continue
+    # shellcheck disable=SC2012 # Playwright names these folders; sort -V needs the list
+    hs=$(ls -d "$base"/chromium_headless_shell-*/chrome-headless-shell-*/chrome-headless-shell 2>/dev/null | sort -V | tail -1)
+    [ -n "$hs" ] && [ -x "$hs" ] && { say "$hs"; return; }
+  done
+  say "${AGENT_BROWSER_EXECUTABLE_PATH:-}"
+}
+headed_exe() { say "${DEV_UP_AB_HEADED:-${AGENT_BROWSER_EXECUTABLE_PATH:-}}"; }
+ab_env() {
+  local port="$1" mode; mode=$(ab_mode "$port")
+  mkdir -p "$STATE_DIR/profiles" && chmod 700 "$STATE_DIR"
+  export AGENT_BROWSER_SESSION; AGENT_BROWSER_SESSION=$(ab_session "$port")
+  export AGENT_BROWSER_PROFILE="$STATE_DIR/profiles/$port-$mode"
+  export AGENT_BROWSER_ARGS="--class=agent-browser"
+  # The outdated-Chrome check fetches Google's release blog on every launch and prints a CVE
+  # warning on every call; the session only ever opens localhost.
+  export AGENT_BROWSER_NO_VERSION_CHECK=1
+  local exe
+  if [ "$mode" = headed ]; then export AGENT_BROWSER_HEADED=1; exe=$(headed_exe)
+  else unset AGENT_BROWSER_HEADED; exe=$(headless_exe); fi
+  # DEV_UP_AB_NOWINDOW=1 keeps the mode's browser and profile but shows no window.
+  [ "${DEV_UP_AB_NOWINDOW:-}" = 1 ] && unset AGENT_BROWSER_HEADED
+  if [ -n "$exe" ]; then export AGENT_BROWSER_EXECUTABLE_PATH="$exe"; else unset AGENT_BROWSER_EXECUTABLE_PATH; fi
+}
+cmd_ab() {
+  local port="$1" list a shot="" skip=""; shift
+  have agent-browser || die 3 "agent-browser is not on PATH"
+  [ $# -gt 0 ] || die 2 "ab PORT <agent-browser command...>"
+  # A version manager's shim with no binary behind it passes have and fails every call.
+  list=$(agent-browser session list 2>&1) || die 3 "agent-browser is on PATH but does not run: $(say "$list" | head -1)"
+  if [ "$1" = js ]; then
+    shift; if [ "${1:-}" = - ]; then shift; set -- eval --stdin "$@"; else set -- eval "$@"; fi
+  fi
+  # screenshot [selector] [path]: only the last positional argument can be the path.
+  if [ "$1" = screenshot ]; then
+    for a in "${@:2}"; do
+      if [ -n "$skip" ]; then skip=""; continue; fi
+      case "$a" in
+        --threshold|--screenshot-dir|--screenshot-quality|--screenshot-format) skip=1 ;;
+        -*) ;;
+        *) shot="$a" ;;
+      esac
+    done
+    case "${shot%%/*}" in *=*) shot="" ;; esac
+    case "$(say "$shot" | tr '[:upper:]' '[:lower:]')" in
+      */*.png|*/*.jpg|*/*.jpeg|*/*.webp) mkdir -p "$(dirname "$shot")" ;;
+    esac
+  fi
+  # A dead daemon (idle timeout, a crash) would come back on about:blank for any command but open.
+  case "$1" in
+    open|goto|navigate|close|quit|exit|session|state|skills|dashboard|install|--*) ;;
+    *) if ! say "$list" | grep -qw -- "$(ab_session "$port")"; then
+         say "dev-up: the session on port $port had closed; reopened it at http://localhost:$port/" >&2
+         ( ab_env "$port"; agent-browser --idle-timeout 30m open "http://localhost:$port/" >/dev/null 2>&1 )
+       fi ;;
+  esac
+  ( ab_env "$port"; exec agent-browser --idle-timeout 30m "$@" )
+}
+cmd_switch() {
+  local port="$1" want="$2" url="" auth
+  [ "$(ab_mode "$port")" = "$want" ] && ab_alive "$port" && { say "ALREADY mode=$want"; return 0; }
+  auth="$STATE_DIR/auth-$port.json"
+  if ab_alive "$port"; then
+    url=$(cmd_ab "$port" get url 2>/dev/null | tail -1)
+    cmd_ab "$port" state save "$auth" >/dev/null 2>&1 && chmod 600 "$auth"
+    cmd_ab "$port" close >/dev/null 2>&1
+  elif [ -d "$STATE_DIR/profiles/$port-$(ab_mode "$port")" ]; then
+    # The session closed (idle timeout) after a login in its profile: read the profile back with
+    # no window, or the other mode opens logged out.
+    ( export DEV_UP_AB_NOWINDOW=1
+      cmd_ab "$port" open "http://localhost:$port/" >/dev/null 2>&1 &&
+        cmd_ab "$port" state save "$auth" >/dev/null 2>&1 && chmod 600 "$auth"
+      cmd_ab "$port" close >/dev/null 2>&1 )
+  fi
+  case "$url" in http*) ;; *) url="http://localhost:$port/" ;; esac
+  [ -f "$(f "$port" state)" ] || state_write "$port" "session=$(session_id)" "dir=$(toplevel "$PWD")"
+  state_write "$port" "ab_mode=$want"
+  # --state cannot go with --profile ("Cannot use storage_state with profile"): open, load, reopen.
+  cmd_ab "$port" open "$url" >/dev/null 2>&1 || { say "FAILED mode=$want url=$url"; return 1; }
+  if [ -s "$auth" ]; then
+    cmd_ab "$port" state load "$auth" >/dev/null 2>&1 && cmd_ab "$port" open "$url" >/dev/null 2>&1
+  fi
+  say "SWITCHED mode=$want url=$url"
+}
+cmd_dash() {
+  local port="${DEV_UP_AB_DASH_PORT:-4848}"
+  if ! bound "$port"; then agent-browser dashboard start --port "$port" >/dev/null 2>&1 || die 3 "dashboard did not start"; fi
+  say "DASH url=http://localhost:$port"
+}
+cmd_browser() { ( ab_env "$1"; say "mode=$(ab_mode "$1") session=$AGENT_BROWSER_SESSION exe=${AGENT_BROWSER_EXECUTABLE_PATH:-} profile=$AGENT_BROWSER_PROFILE alive=$(ab_alive "$1" && echo yes || echo no)" ); }
+
 cmd="${1:-}"; [ $# -gt 0 ] && shift
-if [ "$cmd" != unwatched ] && self=$(readlink -f "$0" 2>/dev/null) && [ "$self" != "$CACHE/dev-up.sh" ]; then
-  mkdir -p "$CACHE" && ln -sf "$self" "$CACHE/dev-up.sh"
+if [ "$cmd" != unwatched ] && [ -n "$SELF" ] && [ "$SELF" != "$CACHE/dev-up.sh" ]; then
+  mkdir -p "$CACHE" && ln -sf "$SELF" "$CACHE/dev-up.sh"
+fi
+if [ "$SKILL" = dev-up ]; then
+  case "$cmd" in
+    owner|preflight|serve|wait|logs|watch|stop|state|unwatched|-h|--help|help|'') ;;
+    *) say "dev-up: unknown command '$cmd'"; usage; exit 2 ;;
+  esac
 fi
 case "$cmd" in
-  owner|serve|wait|watch|stop|state) need_port "${1:-}" ;;
+  owner|serve|wait|logs|watch|stop|state|ab|show|hide|browser) need_port "${1:-}" ;;
 esac
 case "$cmd" in
   owner) cmd_owner "$1" ;;
   preflight) cmd_preflight "${1:-}" ;;
   serve) cmd_serve "$@" ;;
   wait) cmd_wait "$1" ;;
+  logs) case "${2:-40}" in ''|*[!0-9]*) die 2 "logs PORT [N]: N must be a number" ;; esac
+        tail -n "${2:-40}" "$(f "$1" log)" 2>/dev/null || die 1 "no log for port $1" ;;
   watch) cmd_watch "$1" ;;
   stop) cmd_stop "$1" "${2:-}" ;;
   state) cmd_state "$@" ;;
   unwatched) cmd_unwatched ;;
+  ab) cmd_ab "$@" ;;
+  show) cmd_switch "$1" headed ;;
+  hide) cmd_switch "$1" headless ;;
+  dash) cmd_dash ;;
+  browser) cmd_browser "$1" ;;
   -h|--help|help|'') usage ;;
   *) say "dev-up: unknown command '$cmd'"; usage; exit 2 ;;
 esac

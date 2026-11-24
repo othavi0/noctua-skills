@@ -5,6 +5,20 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `dev-up` e `dev-up-agent-browser`: as duas skills levam o mesmo
+  `scripts/dev-up.sh`, byte a byte, e cada eval falha com `cmp` quando as
+  cópias divergem. Antes eram dois scripts de 384 e 548 linhas, e toda correção
+  entrava duas vezes. O script lê o nome da pasta acima de `scripts/`
+  (resolvendo symlink) e escolhe por ele o cache (`~/.cache/dev-up` ou
+  `~/.cache/dev-up-ab`) e a chave própria do estado (`tab_id` ou `ab_mode`).
+  Na `dev-up`, `ab`, `show`, `hide`, `dash` e `browser` seguem como
+  comando desconhecido, e o `state PORT show` segue sem a linha do navegador. A
+  `dev-up` ganha por tabela o que a `dev-up-agent-browser` já tinha: o
+  reinício em falha (`Restart=on-failure`, no máximo 5 partidas em 10 minutos)
+  com a linha `dev-up: server exited` no log, no `watch` e no hook, o aviso de
+  unidade viva sem porta aberta, `state PORT resume` e `logs PORT [N]`. O
+  teste de bash 3.2 monta a pasta da skill, para o script achar o próprio nome.
+
 - `dev-up-agent-browser`: o `serve` sobe a unidade com `Restart=on-failure`,
   1 s de espera e no máximo 5 partidas em 10 minutos. Nos transcripts de 10 a 24
   de novembro, o `wait` falhou 17 de 101 vezes, 15 delas porque o `next dev`

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# dev-up-agent-browser: the mechanical half of the dev-up-agent-browser skill. One dev server per
-# port, one log, one state file, and one agent-browser session per port. Copied from dev-up, with
-# its own cache, so both skills run side by side.
+# dev-up.sh: the mechanical half of the dev-up and dev-up-agent-browser skills. One dev server per
+# port, one log, one state file; under dev-up-agent-browser, also one agent-browser session per
+# port. Both skills ship this same file, byte for byte. It reads which skill it serves from the
+# folder above scripts/ (symlinks resolved), so each skill keeps its own cache and state keys, and
+# both run side by side.
 #
 # Usage: dev-up.sh <command> [PORT] [args]
 #   owner PORT            FREE | BUSY pid=N cwd=DIR mine=yes|worktree|orphan|no|? via=dev-up|other
@@ -26,6 +28,7 @@
 #   state PORT init | show | get KEY | set KEY=VALUE... | pause | resume | exclude 'TEXT' | rm
 #   unwatched             for the UserPromptSubmit hook: this session's dead servers, and the errors
 #                         logged since the last prompt when the watcher is gone
+# Only under dev-up-agent-browser (dev-up answers "unknown command"):
 #   ab PORT ARGS...       run agent-browser ARGS in the port's session (devup-PORT) with the same
 #                         launch options on every call, so the daemon never relaunches the browser.
 #                         ab PORT js CODE runs agent-browser eval CODE; js - reads it from stdin.
@@ -41,15 +44,20 @@
 # window manager rule can keep it from taking focus. Profiles and saved logins live in
 # ~/.local/state/dev-up-ab.
 #
-# Files in ~/.cache/dev-up-ab: PORT.log, PORT.state (session dir watcher_task ab_mode), PORT.watch
-# (watch), PORT.paused, PORT.exclude (fixed strings, one per line), PORT.hookoff (log offset at
-# the last prompt).
+# Files in ~/.cache/dev-up (dev-up) or ~/.cache/dev-up-ab (dev-up-agent-browser): PORT.log,
+# PORT.state (session dir watcher_task, plus tab_id or ab_mode), PORT.watch (watch), PORT.paused,
+# PORT.exclude (fixed strings, one per line), PORT.hookoff (log offset at the last prompt).
 # Exit codes: 0 ok, 1 negative verdict, 2 usage, 3 refused.
 set -uo pipefail
 
-CACHE="${DEV_UP_CACHE:-$HOME/.cache/dev-up-ab}"
+SELF=$(readlink -f "$0" 2>/dev/null)
+SKILL=$(basename "$(dirname "$(dirname "${SELF:-$0}")")")
+if [ "$SKILL" = dev-up-agent-browser ]; then
+  CACHE="${DEV_UP_CACHE:-$HOME/.cache/dev-up-ab}" KEYS="session dir watcher_task ab_mode"
+else
+  SKILL=dev-up CACHE="${DEV_UP_CACHE:-$HOME/.cache/dev-up}" KEYS="session dir watcher_task tab_id"
+fi
 STATE_DIR="${DEV_UP_AB_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/dev-up-ab}"
-KEYS="session dir watcher_task ab_mode"
 ERRORS='[Ee]rror|Exception|Traceback|Failed to compile|unhandled|ECONNREFUSED|EADDRINUSE|panic|FATAL|^dev-up: server exited'
 NOISE='NEXT_REDIRECT|PoolError|QueuePool limit|Too many connections|favicon\.ico|SIGTERM|terminated by signal|exit code 143|(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) [^ ]+( HTTP/[0-9.]+"?)? [23][0-9][0-9]([^0-9]|$)'
 
@@ -372,7 +380,7 @@ cmd_state() {
       cat "$sf"
       local wp; wp=$(cat "$(f "$port" watch)" 2>/dev/null)
       say "server_alive=$(served "$port" && echo yes || echo no) watcher_alive=$(alive "$wp" && echo yes || echo no) paused=$([ -f "$(f "$port" paused)" ] && echo yes || echo no)"
-      say "browser_alive=$(ab_alive "$port" && echo yes || echo no) mode=$(ab_mode "$port") session=$(ab_session "$port")"
+      [ "$SKILL" = dev-up-agent-browser ] && say "browser_alive=$(ab_alive "$port" && echo yes || echo no) mode=$(ab_mode "$port") session=$(ab_session "$port")"
       [ -s "$(f "$port" exclude)" ] && sed 's/^/excluded: /' "$(f "$port" exclude)"
       return 0 ;;
     rm) rm -f "$sf" "$(f "$port" watch)" "$(f "$port" paused)" "$(f "$port" exclude)" "$(f "$port" hookoff)" "$(f "$port" pid)" ;;
@@ -521,8 +529,14 @@ cmd_dash() {
 cmd_browser() { ( ab_env "$1"; say "mode=$(ab_mode "$1") session=$AGENT_BROWSER_SESSION exe=${AGENT_BROWSER_EXECUTABLE_PATH:-} profile=$AGENT_BROWSER_PROFILE alive=$(ab_alive "$1" && echo yes || echo no)" ); }
 
 cmd="${1:-}"; [ $# -gt 0 ] && shift
-if [ "$cmd" != unwatched ] && self=$(readlink -f "$0" 2>/dev/null) && [ "$self" != "$CACHE/dev-up.sh" ]; then
-  mkdir -p "$CACHE" && ln -sf "$self" "$CACHE/dev-up.sh"
+if [ "$cmd" != unwatched ] && [ -n "$SELF" ] && [ "$SELF" != "$CACHE/dev-up.sh" ]; then
+  mkdir -p "$CACHE" && ln -sf "$SELF" "$CACHE/dev-up.sh"
+fi
+if [ "$SKILL" = dev-up ]; then
+  case "$cmd" in
+    owner|preflight|serve|wait|logs|watch|stop|state|unwatched|-h|--help|help|'') ;;
+    *) say "dev-up: unknown command '$cmd'"; usage; exit 2 ;;
+  esac
 fi
 case "$cmd" in
   owner|serve|wait|logs|watch|stop|state|ab|show|hide|browser) need_port "${1:-}" ;;

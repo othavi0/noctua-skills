@@ -13,6 +13,7 @@ allowed-tools:
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh owner *)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh preflight *)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh wait *)
+  - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh logs *)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh watch *)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh state *)
 hooks:

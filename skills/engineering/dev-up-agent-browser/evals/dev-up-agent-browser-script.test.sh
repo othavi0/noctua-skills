@@ -99,6 +99,7 @@ check "state show sees the unit" "$("$DU" state $P show | grep -o 'server_alive=
 "$DU" state $P set watcher_task=b123 ab_mode=headed
 check "init keeps this session's state" "$("$DU" state $P init | head -1)" "kept:*"
 check "init kept the fields" "$("$DU" state $P get watcher_task),$("$DU" state $P get ab_mode)" "b123,headed"
+check "state refuses the dev-up tab key" "$("$DU" state $P set tab_id=77 2>&1; echo "exit=$?")" "*unknown key 'tab_id'*exit=2"
 check "owner from another session says state=other" "$(CLAUDE_CODE_SESSION_ID=session-b "$DU" owner $P)" "*state=other"
 check "serve refuses a bound port" "$("$DU" serve $P -- true 2>&1; echo "exit=$?")" "*exit=3"
 check "state refuses a placeholder task id" "$("$DU" state $P set watcher_task=PENDING 2>&1; echo "exit=$?")" "*exit=3"
@@ -307,10 +308,16 @@ check "the hook reaches the script through the cache pointer" "$(printf '{"sessi
 check "the hook is silent for other sessions" "$(printf '{"session_id":"session-x"}' | bash -c "$hook")" ""
 check "help prints the whole header" "$("$DU" help | tail -1)" "# Exit codes: *"
 check "an unknown command lists every command" "$("$DU" bogus | grep -c 'unwatched')" "1"
+TWIN="$HERE/../dev-up/scripts/dev-up.sh"
+if [ -f "$TWIN" ]; then
+  check "the script is byte for byte the one dev-up ships" "$(cmp "$DU" "$TWIN" 2>&1 && echo same)" "same"
+else
+  echo "skip twin script (no $TWIN)"
+fi
 
 if command -v docker >/dev/null && docker image inspect bash:3.2 >/dev/null 2>&1; then
-  out=$(docker run --rm -v "$HERE/scripts:/s:ro" -e CLAUDE_CODE_SESSION_ID=s bash:3.2 bash -c \
-    'export DEV_UP_CACHE=/tmp/c; bash /s/dev-up.sh state 3000 init >/dev/null && bash /s/dev-up.sh state 3000 set ab_mode=headed watcher_task=b1 && bash /s/dev-up.sh state 3000 exclude "some (text" >/dev/null && bash /s/dev-up.sh state 3000 get ab_mode' 2>&1)
+  out=$(docker run --rm -v "$HERE:/dev-up-agent-browser:ro" -e CLAUDE_CODE_SESSION_ID=s bash:3.2 bash -c \
+    'export DEV_UP_CACHE=/tmp/c; bash /dev-up-agent-browser/scripts/dev-up.sh state 3000 init >/dev/null && bash /dev-up-agent-browser/scripts/dev-up.sh state 3000 set ab_mode=headed watcher_task=b1 && bash /dev-up-agent-browser/scripts/dev-up.sh state 3000 exclude "some (text" >/dev/null && bash /dev-up-agent-browser/scripts/dev-up.sh state 3000 get ab_mode' 2>&1)
   check "state works on bash 3.2" "$out" "headed"
 else
   echo "skip bash 3.2 (no docker image bash:3.2)"
