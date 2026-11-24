@@ -7,7 +7,7 @@ HERE=$(cd "$(dirname "$0")/.." && pwd)
 DU="$HERE/scripts/dev-up.sh"
 T=$(mktemp -d); T=$(cd "$T" && pwd -P)
 export DEV_UP_CACHE="$T/cache" CLAUDE_CODE_SESSION_ID=session-a
-P=$((20000 + RANDOM % 20000)); P2=$((P + 1)); P3=$((P + 2))
+P=$((39000 + RANDOM % 20000)); P2=$((P + 1)); P3=$((P + 2))
 fails=0
 check() { if [[ "$2" == $3 ]]; then echo "ok   $1"; else echo "FAIL $1: got '$2', want '$3'"; fails=$((fails + 1)); fi; }
 serve() { timeout 10 "$DU" serve "$@"; }
@@ -43,6 +43,9 @@ check "state show sees the unit" "$("$DU" state $P show | grep -o 'server_alive=
 "$DU" state $P set watcher_task=b123 tab_id=77
 check "init keeps this session's state" "$("$DU" state $P init | head -1)" "kept:*"
 check "init kept the fields" "$("$DU" state $P get watcher_task),$("$DU" state $P get tab_id)" "b123,77"
+check "state refuses the agent-browser key" "$("$DU" state $P set ab_mode=headed 2>&1; echo "exit=$?")" "*unknown key 'ab_mode'*exit=2"
+check "state show has no browser line" "$("$DU" state $P show | grep -c browser_alive)" "0"
+check "the agent-browser commands are unknown here" "$("$DU" ab $P get title 2>&1; echo "exit=$?")" "dev-up: unknown command 'ab'*exit=2"
 check "owner from another session says state=other" "$(CLAUDE_CODE_SESSION_ID=session-b "$DU" owner $P)" "*state=other"
 check "serve refuses a bound port" "$("$DU" serve $P -- true 2>&1; echo "exit=$?")" "*exit=3"
 check "state refuses a placeholder task id" "$("$DU" state $P set watcher_task=PENDING 2>&1; echo "exit=$?")" "*exit=3"
@@ -192,10 +195,16 @@ check "the hook reaches the script through the cache pointer" "$(printf '{"sessi
 check "the hook is silent for other sessions" "$(printf '{"session_id":"session-x"}' | bash -c "$hook")" ""
 check "help prints the whole header" "$("$DU" help | tail -1)" "# Exit codes: *"
 check "an unknown command lists every command" "$("$DU" bogus | grep -c 'unwatched')" "1"
+TWIN="$HERE/../dev-up-agent-browser/scripts/dev-up.sh"
+if [ -f "$TWIN" ]; then
+  check "the script is byte for byte the one dev-up-agent-browser ships" "$(cmp "$DU" "$TWIN" 2>&1 && echo same)" "same"
+else
+  echo "skip twin script (no $TWIN)"
+fi
 
 if command -v docker >/dev/null && docker image inspect bash:3.2 >/dev/null 2>&1; then
-  out=$(docker run --rm -v "$HERE/scripts:/s:ro" -e CLAUDE_CODE_SESSION_ID=s bash:3.2 bash -c \
-    'export DEV_UP_CACHE=/tmp/c; bash /s/dev-up.sh state 3000 init >/dev/null && bash /s/dev-up.sh state 3000 set tab_id=77 watcher_task=b1 && bash /s/dev-up.sh state 3000 exclude "some (text" >/dev/null && bash /s/dev-up.sh state 3000 get tab_id' 2>&1)
+  out=$(docker run --rm -v "$HERE:/dev-up:ro" -e CLAUDE_CODE_SESSION_ID=s bash:3.2 bash -c \
+    'export DEV_UP_CACHE=/tmp/c; bash /dev-up/scripts/dev-up.sh state 3000 init >/dev/null && bash /dev-up/scripts/dev-up.sh state 3000 set tab_id=77 watcher_task=b1 && bash /dev-up/scripts/dev-up.sh state 3000 exclude "some (text" >/dev/null && bash /dev-up/scripts/dev-up.sh state 3000 get tab_id' 2>&1)
   check "state works on bash 3.2" "$out" "77"
 else
   echo "skip bash 3.2 (no docker image bash:3.2)"
