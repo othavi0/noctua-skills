@@ -5,6 +5,19 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `dev-up-agent-browser`: o `serve` sobe a unidade com `Restart=on-failure`,
+  1 s de espera e no máximo 3 partidas por minuto. Nos transcripts de 10 a 24
+  de novembro, o `wait` falhou 17 de 101 vezes, 15 delas porque o `next dev`
+  16.4 sai com código 1 fora de TTY para mostrar o aviso de upgrade e só sobe na
+  repetição. O journal tem 4 `oom-kill` de unidades `dev-up-N` no mesmo
+  período. As duas quedas agora voltam sozinhas, e cada uma grava no log a linha
+  `dev-up: server exited result=R code=C status=S`, que o `watch` e o hook
+  repassam. Comando que falha sempre ainda dá `DIED`. Entram `state PORT
+  resume` e `logs PORT [N]`, que os agentes chamaram 6 vezes sem existir. O
+  `ab PORT screenshot` cria a pasta do caminho, depois de 36 falhas por pasta
+  inexistente, e o `ab` sai com código 3 e um `ERROR` quando o próprio
+  `agent-browser` não executa, no lugar de dizer que reabriu a sessão.
+
 - `dev-up-agent-browser`: `ab PORT js '<código>'` roda o `agent-browser eval`, e
   `ab PORT js -` lê o código do stdin. Uma sessão isolada em worktree recusa
   todo comando com a palavra `eval`, então a skill e as references ensinam
