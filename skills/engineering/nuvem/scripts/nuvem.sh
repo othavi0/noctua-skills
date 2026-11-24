@@ -22,13 +22,14 @@ key() {
   if [ -n "${ANTHROPIC_API_KEY:-}" ]; then printf '%s' "$ANTHROPIC_API_KEY"; else cat "$KEY_FILE"; fi
 }
 # The key reaches curl on stdin (printf is a builtin), never in argv.
+# No files-api beta: the Files API is GA, and on 24/11 every GET here gave the same code with and without it.
 call() {
   local method="$1" path="$2"
   shift 2
   printf 'header = "x-api-key: %s"\n' "$(key)" |
     curl -sS --fail-with-body -K - -X "$method" "$API$path" \
       -H "anthropic-version: 2026-10-21" \
-      -H "anthropic-beta: managed-agents-2026-04-01,files-api-2025-04-14" \
+      -H "anthropic-beta: managed-agents-2026-04-01" \
       "$@"
 }
 json() { call "$1" "$2" -H "content-type: application/json" -d "$3"; }
@@ -205,23 +206,27 @@ fetch)
   need_name
   out="$STATE/out-$name"
   mkdir -p "$out"
-  after=""
+  page=""
   failures=0
   while :; do
-    body="$(call GET "/files?scope_id=$(sid)&limit=100${after:+&after_id=$after}")" || die "cannot list the session's files"
+    body="$(call GET "/files?scope_id=$(sid)&limit=100${page:+&page=$page}")" || die "cannot list the session's files"
+    # The uploads the session mounted (bundle, support archive) are listed too, and the API
+    # answers 400 file_not_downloadable for them: only what the agent wrote is downloadable.
     while read -r id file; do
-      case "$file" in *.bundle | support.tar.gz) continue ;; esac
       target="$out/$(basename "$file")"
-      if call GET "/files/$id/content" -o "$target.part"; then
+      if code="$(call GET "/files/$id/content" -o "$target.part" -w '%{http_code}' 2>/dev/null)"; then
         mv "$target.part" "$target" && echo "$target"
       else
+        reason="$(jq -r '.error.message // empty' "$target.part" 2>/dev/null || true)"
         rm -f "$target.part"
-        echo "FAILED to download $file" >&2
+        echo "FAILED to download $file: HTTP ${code:-000} from GET /files/$id/content${reason:+: $reason}" >&2
         failures=$((failures + 1))
       fi
-    done < <(echo "$body" | jq -r '.data[] | "\(.id) \(.filename)"')
-    [ "$(echo "$body" | jq -r '.has_more')" = true ] || break
-    after="$(echo "$body" | jq -r '.last_id')"
+    done < <(echo "$body" | jq -r '.data[] | select(.downloadable == true) | "\(.id) \(.filename)"')
+    next="$(echo "$body" | jq -r '.next_page // empty')" || die "cannot read the files listing"
+    [ -n "$next" ] || break
+    [ "$next" != "$page" ] || die "the files listing repeated its cursor; stopped"
+    page="$next"
   done
   [ "$failures" -eq 0 ] || die "$failures download(s) failed; run fetch again before archiving"
   ;;
