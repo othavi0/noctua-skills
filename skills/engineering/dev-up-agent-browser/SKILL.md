@@ -110,7 +110,7 @@ Done when `S state PORT show` prints this checkout's `dir`.
    systemd user unit `dev-up-PORT` with this shell's environment, capped at 4G of RAM and 1G of
    swap. `--mem SIZE` and `--swap SIZE` change the caps; `--mem none` lifts both, only when the
    user asks. A server that exits with a failure (an error exit, `oom-kill`) starts again by
-   itself, at most 3 starts a minute, and each fall logs a `dev-up: server exited result=...`
+   itself, at most 5 starts in 10 minutes, and each fall logs a `dev-up: server exited result=...`
    line. After
    editing `.env` this session, prefix the command with `set -a; . ./.env; set +a;`.
 5. `S wait PORT` in a foreground Bash call with `timeout: 600000`.

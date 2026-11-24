@@ -14,8 +14,9 @@
 #                         to PORT.log, and return: STARTED unit=dev-up-PORT log=FILE. The unit gets
 #                         MemoryMax (default 4G, or DEV_UP_MEM) and MemorySwapMax (default 1G, or
 #                         DEV_UP_SWAP); --mem none lifts both. A server that exits with a failure
-#                         (an error exit, oom-kill) starts again after 1 s, at most 3 starts a
-#                         minute; each fall logs "dev-up: server exited result=R code=C status=S"
+#                         (an error exit, oom-kill) starts again after 1 s, at most 5 starts in
+#                         10 minutes; each fall logs "dev-up: server exited result=R code=C status=S".
+#                         A stop logs nothing
 #   wait PORT             READY http=N | HTTP_5XX http=N | DIED | BUSY_OTHER pid=N | BOUND_NO_HTTP | TIMEOUT
 #   logs PORT [N]         the last N lines of PORT.log (default 40)
 #   watch PORT            the Monitor command: new error lines from the log, minus noise and excludes,
@@ -28,7 +29,8 @@
 #   ab PORT ARGS...       run agent-browser ARGS in the port's session (devup-PORT) with the same
 #                         launch options on every call, so the daemon never relaunches the browser.
 #                         ab PORT js CODE runs agent-browser eval CODE; js - reads it from stdin.
-#                         ab PORT screenshot DIR/FILE.png creates DIR. Exits 3 when agent-browser
+#                         ab PORT screenshot ... DIR/FILE.png creates DIR when the last argument is
+#                         an image path (any case), not a selector like text=a/b.png. Exits 3 when agent-browser
 #                         itself does not run
 #   show PORT | hide PORT switch the session to a visible window (headed) or back to headless,
 #                         carrying cookies and storage: SWITCHED mode=M url=U | ALREADY mode=M
@@ -81,6 +83,12 @@ unit() { say "dev-up-$1"; }
 served() {
   case "$(systemctl --user show -p ActiveState --value "$(unit "$1")" 2>/dev/null)" in
     active|activating|deactivating|reloading|refreshing) return 0 ;;
+  esac
+  return 1
+}
+restarting() {
+  case "$(systemctl --user show -p ActiveState -p SubState --value "$(unit "$1")" 2>/dev/null | tr '\n' /)" in
+    */auto-restart*|deactivating/*) return 0 ;;
   esac
   return 1
 }
@@ -219,13 +227,15 @@ cmd_serve() {
   # unit's transient file under /run/user, readable only by this user.
   # next dev exits 1 to show an upgrade notice when it sees an agent in the environment (CLAUDECODE,
   # AI_AGENT, which this unit inherits) and starts on the retry; an oom-kill
-  # used to leave the port dead. Both come back; a command that always fails stops after 3 starts.
-  # ExecStopPost logs why each run ended, except a clean stop.
+  # used to leave the port dead. Both come back; a server that falls 5 times in 10 minutes, fast
+  # or slow, stays down. ExecStopPost logs why each run ended, except a clean exit and a stop
+  # (cmd_stop leaves PORT.stopping while it runs).
   local -a env=() props=(-p TimeoutStopSec=10 -p Restart=on-failure -p RestartSec=1
-    -p StartLimitIntervalSec=60 -p StartLimitBurst=3
-    -p "ExecStopPost=$(command -v bash) -c '[ \"\$\$SERVICE_RESULT\" = success ] || echo \"dev-up: server exited result=\$\$SERVICE_RESULT code=\$\$EXIT_CODE status=\$\$EXIT_STATUS\" >>\"\$\$DEV_UP_LOG\"'")
+    -p StartLimitIntervalSec=600 -p StartLimitBurst=5
+    -p "ExecStopPost=$(command -v bash) -c '[ \"\$\$SERVICE_RESULT\" = success ] || [ -e \"\$\$DEV_UP_STOPPING\" ] || echo \"dev-up: server exited result=\$\$SERVICE_RESULT code=\$\$EXIT_CODE status=\$\$EXIT_STATUS\" >>\"\$\$DEV_UP_LOG\"'")
   for v in $(compgen -e); do env+=(--setenv="$v"); done
-  env+=(--setenv="DEV_UP_LOG=$log")
+  env+=(--setenv="DEV_UP_LOG=$log" --setenv="DEV_UP_STOPPING=$(f "$port" stopping)")
+  rm -f "$(f "$port" stopping)"
   # Capped by default: an uncapped dev server grew past 5 GiB of RAM and kept 2 to 3 GiB in swap
   # (measured on two servers, 11 Nov 2026), and four of them left the machine without memory. With
   # MemoryMax alone the server spills into swap without limit, so the swap gets its own ceiling.
@@ -294,7 +304,9 @@ cmd_stop() {
   lp=$(listener_pid "$port")
   [ -n "$lp" ] && cwd=$(proc_cwd "$lp")
   if served "$port" && { [ -z "$lp" ] || in_unit "$lp" "$port"; }; then
+    : >"$(f "$port" stopping)"
     systemctl --user stop "$(unit "$port")" 2>/dev/null
+    rm -f "$(f "$port" stopping)"
   elif orphan "$cwd" || [ "$force" = --force ]; then
     [ -n "$lp" ] || die 3 "cannot see the listener's pid (another user's process?)"
     for p in $(tree "$lp"); do kill -TERM "$p" 2>/dev/null; done
@@ -380,7 +392,10 @@ cmd_unwatched() {
     port=$(basename "$sf" .state)
     [ "$(state_get "$port" session)" = "$sid" ] || continue
     wp=$(cat "$(f "$port" watch)" 2>/dev/null)
-    if ! bound "$port" && ! served "$port"; then
+    if bound "$port" || restarting "$port"; then :
+    elif served "$port"; then
+      say "dev-up: the unit on port $port runs but nothing listens on the port (log: $(f "$port" log))."
+    else
       say "dev-up: the server on port $port is down (log: $(f "$port" log)). Its state is cleared; run /dev-up $port to bring it back."
       last_fall "$port"
       rm -f "$sf" "$(f "$port" watch)" "$(f "$port" paused)" "$(f "$port" hookoff)" "$(f "$port" pid)"
@@ -439,7 +454,7 @@ ab_env() {
   if [ -n "$exe" ]; then export AGENT_BROWSER_EXECUTABLE_PATH="$exe"; else unset AGENT_BROWSER_EXECUTABLE_PATH; fi
 }
 cmd_ab() {
-  local port="$1" list a; shift
+  local port="$1" list a shot="" skip=""; shift
   have agent-browser || die 3 "agent-browser is not on PATH"
   [ $# -gt 0 ] || die 2 "ab PORT <agent-browser command...>"
   # A version manager's shim with no binary behind it passes have and fails every call.
@@ -447,8 +462,20 @@ cmd_ab() {
   if [ "$1" = js ]; then
     shift; if [ "${1:-}" = - ]; then shift; set -- eval --stdin "$@"; else set -- eval "$@"; fi
   fi
+  # screenshot [selector] [path]: only the last positional argument can be the path.
   if [ "$1" = screenshot ]; then
-    for a in "$@"; do case "$a" in -*) ;; */*.png|*/*.jpg|*/*.jpeg|*/*.webp) mkdir -p "$(dirname "$a")" ;; esac; done
+    for a in "${@:2}"; do
+      if [ -n "$skip" ]; then skip=""; continue; fi
+      case "$a" in
+        --threshold|--screenshot-dir|--screenshot-quality|--screenshot-format) skip=1 ;;
+        -*) ;;
+        *) shot="$a" ;;
+      esac
+    done
+    case "${shot%%/*}" in *=*) shot="" ;; esac
+    case "$(say "$shot" | tr '[:upper:]' '[:lower:]')" in
+      */*.png|*/*.jpg|*/*.jpeg|*/*.webp) mkdir -p "$(dirname "$shot")" ;;
+    esac
   fi
   # A dead daemon (idle timeout, a crash) would come back on about:blank for any command but open.
   case "$1" in

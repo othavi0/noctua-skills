@@ -219,7 +219,7 @@ done
 serve $P -- "n=\$(cat '$T/r5b' 2>/dev/null || echo 0); echo \$((n + 1)) >'$T/r5b'; [ \$n -ge 1 ] || { sleep 0.5; exit 1; }; exec python3 -m http.server $P" >/dev/null 2>&1
 for _ in $(seq 100); do [ "$(systemctl --user show -p SubState --value "dev-up-$P")" = auto-restart ] && break; sleep 0.03; done
 out=$("$DU" unwatched)
-check "the hook never calls a server in its restart window down" "$(printf '%s' "$out" | grep -c 'is down')" "0"
+check "the hook keeps quiet about a server in its restart window" "$(printf '%s' "$out" | grep -cE 'is down|nothing listens')" "0"
 check "and keeps its state" "$("$DU" state $P get dir)" "$T/app"
 "$DU" wait $P >/dev/null; "$DU" stop $P >/dev/null
 serve $P -- "n=\$(cat '$T/r5c' 2>/dev/null || echo 0); echo \$((n + 1)) >'$T/r5c'; [ \$n -ge 1 ] || { sleep 0.5; exit 1; }; exec python3 -m http.server $P" >/dev/null 2>&1

@@ -28,8 +28,11 @@ Read this when `wait` says anything but `READY`, the server dies, or the session
 
 ## The server went down
 
-Each fall logs `dev-up: server exited result=R code=C status=S`, and `watch` and the hook report
-it. The unit starts again by itself, up to 3 starts a minute; past that `wait` says `DIED`.
+Each fall logs `dev-up: server exited result=R code=C status=S`. A live watcher reports the line;
+with no watcher, the hook prints it at the next prompt. `stop` logs no line. The unit starts again
+by itself, up to 5 starts in 10 minutes; past that it stays down, a running `wait` says `DIED`,
+and the hook says the server is down. The hook also says when the unit runs but nothing listens on
+the port; it keeps quiet only during the second between a fall and its restart.
 `result=oom-kill` is the unit's own cap (4G of RAM and 1G of swap by default): when it repeats,
 Restart with a higher cap, `serve --mem 6G --swap 2G`, and tell the user the server outgrew the
 default. `journalctl --user -u dev-up-PORT` keeps the same reasons. A `SIGTERM` while a
