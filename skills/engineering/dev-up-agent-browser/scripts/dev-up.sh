@@ -217,7 +217,8 @@ cmd_serve() {
   # A service unit starts from the user manager's environment, not this shell's: copy every
   # exported variable by name. Values stay off the command line; systemd keeps them in the
   # unit's transient file under /run/user, readable only by this user.
-  # next dev exits 1 outside a TTY to show an upgrade notice and starts on the retry; an oom-kill
+  # next dev exits 1 to show an upgrade notice when it sees an agent in the environment (CLAUDECODE,
+  # AI_AGENT, which this unit inherits) and starts on the retry; an oom-kill
   # used to leave the port dead. Both come back; a command that always fails stops after 3 starts.
   # ExecStopPost logs why each run ended, except a clean stop.
   local -a env=() props=(-p TimeoutStopSec=10 -p Restart=on-failure -p RestartSec=1

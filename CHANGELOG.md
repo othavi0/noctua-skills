@@ -8,7 +8,8 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 - `dev-up-agent-browser`: o `serve` sobe a unidade com `Restart=on-failure`,
   1 s de espera e no máximo 3 partidas por minuto. Nos transcripts de 10 a 24
   de novembro, o `wait` falhou 17 de 101 vezes, 15 delas porque o `next dev`
-  16.4 sai com código 1 fora de TTY para mostrar o aviso de upgrade e só sobe na
+  16.4 sai com código 1 para mostrar o aviso de upgrade quando vê um agente no
+  ambiente (`CLAUDECODE`, `AI_AGENT`, que o `serve` copia) e só sobe na
   repetição. O journal tem 4 `oom-kill` de unidades `dev-up-N` no mesmo
   período. As duas quedas agora voltam sozinhas, e cada uma grava no log a linha
   `dev-up: server exited result=R code=C status=S`, que o `watch` e o hook
