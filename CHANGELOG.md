@@ -5,6 +5,25 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `dev-up-agent-browser`: a sessão headless que fecha por ociosidade volta na
+  última página que mostrava, e não mais na raiz. Nos transcripts de 10 a 24 de
+  novembro houve 26 avisos "had closed; reopened it at http://localhost:N/". O
+  agent-browser já grava a URL da aba em `SOCKETDIR/devup-PORTA.target`, que
+  fica depois que o daemon fecha. O `ab` lê esse arquivo só quando a sessão
+  precisa voltar, então a chamada numa sessão viva segue com o mesmo único
+  `session list`. A URL volta sem a query string, porque o agent-browser a
+  descarta, e uma URL de outra origem ou um `about:blank` voltam para a raiz.
+  O `show` e o `hide` de uma sessão que fechou também abrem nessa página. O
+  `browser` e o `state show` diziam `alive=no` para uma sessão viva sob
+  carga: o `grep -q` saía no primeiro acerto, o agent-browser morria com
+  SIGPIPE ao escrever a linha seguinte, e o `pipefail` virava o acerto em
+  falha (291 de 500 chamadas com um `yes` por núcleo, 0 de 500 lendo a lista
+  inteira). O hook de servidor caído nomeia a skill que o script serve (`run
+  /dev-up-agent-browser PORTA`), e não mais sempre `/dev-up`. O
+  `references/interacting.md` aponta `scroll`, `scrollintoview`, `get box` e
+  `get styles` no lugar de `js`, porque numa amostra de 938 chamadas de `js`,
+  29% só rolavam a página e 26% mediam layout.
+
 - `humanize-pt-br`: o `scripts/scan.py` ganha 23 regras para formas fixas do
   catálogo. Entram como marca "não se trata de X, trata-se de Y" e "mais do
   que X, é Y" (17), a lista negativa 18, a abertura formulaica 3, o setup

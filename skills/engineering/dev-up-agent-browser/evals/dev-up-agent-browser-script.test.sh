@@ -53,6 +53,12 @@ chmod +x "$T/brokenab/agent-browser"
 out=$(PATH="$T/brokenab:$PATH" "$DU" ab $P get title 2>&1; echo "exit=$?")
 check "ab names an agent-browser that does not run and exits 3" "$out" "ERROR: agent-browser*does not run*mise ERROR*exit=3"
 check "and never claims it reopened the session" "$(printf '%s' "$out" | grep -c reopened)" "0"
+# grep -q in a pipe leaves at the first match; with pipefail the next line agent-browser writes
+# (SIGPIPE) used to turn a live session into alive=no, 291 times in 500 under load.
+mkdir -p "$T/slowab"
+printf '#!/bin/sh\necho "Active sessions:"\necho "  devup-%s"\nsleep 0.3\necho "  devup-other"\n' "$P" >"$T/slowab/agent-browser"
+chmod +x "$T/slowab/agent-browser"
+check "a live session listed before others reads as alive" "$(PATH="$T/slowab:$PATH" DEV_UP_AB_STATE="$T/abstate" "$DU" browser $P)" "*alive=yes"
 
 # Login recipes: one per repo, outside git, found from every worktree, never holding a password.
 git -C "$T/app" remote add origin https://github.com/dono/app.git
@@ -124,9 +130,11 @@ EOF
   # Idle: the headless session closes, the visible window never does, and keeps its browser.
   ab close >/dev/null
   export DEV_UP_AB_IDLE=3s
-  ab open "http://localhost:$P/" >/dev/null
+  printf '<title>eval-rota</title>\n' >"$T/app/rota.html"
+  ab open "http://localhost:$P/rota.html?x=1" >/dev/null
   sleep 6
   check "a headless session closes after DEV_UP_AB_IDLE idle" "$("$DU" browser $P)" "*alive=no"
+  check "the next call reopens it on the page it showed last" "$(timeout 60 "$DU" ab $P get title 2>&1)" "*reopened it at http://localhost:$P/rota.html*eval-rota"
   export DEV_UP_AB_NOWINDOW=1
   "$DU" show $P >/dev/null
   hpid() { pgrep -of "[u]ser-data-dir=$T/abstate/profiles/$P-headed"; }
@@ -138,7 +146,7 @@ EOF
   "$DU" hide $P >/dev/null
   unset DEV_UP_AB_NOWINDOW
   ab close >/dev/null
-  rm -f "$T/app/index.html" "$T/app/login.sh"
+  rm -f "$T/app/index.html" "$T/app/rota.html" "$T/app/login.sh"
 else
   echo "skip agent-browser checks (agent-browser is not on PATH)"
 fi
@@ -225,7 +233,7 @@ serve $P -- "python3 -m http.server $P" >/dev/null 2>&1
 check "stop frees the server serve started" "$("$DU" stop $P)" "STOPPED"
 check "stop removes the unit" "$(active $P)" "inactive"
 : >"$DEV_UP_CACHE/$P.pid"
-check "unwatched reports a dead server once" "$("$DU" unwatched)" "*server on port $P is down*"
+check "unwatched reports a dead server once, naming this skill" "$("$DU" unwatched)" "*server on port $P is down*run /dev-up-agent-browser $P to bring it back*"
 check "and then clears its state" "$("$DU" unwatched)" ""
 check "the server-down branch removes the hook offset and the legacy pid file" "$(ls "$DEV_UP_CACHE/$P.hookoff" "$DEV_UP_CACHE/$P.state" "$DEV_UP_CACHE/$P.pid" 2>/dev/null)" ""
 

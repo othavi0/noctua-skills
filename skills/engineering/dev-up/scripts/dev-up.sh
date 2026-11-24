@@ -32,7 +32,7 @@
 #   ab PORT ARGS...       run agent-browser ARGS in the port's session (devup-PORT) with the same
 #                         launch options on every call, so the daemon never relaunches the browser.
 #                         A headless session shuts down after 30 min idle (DEV_UP_AB_IDLE changes it);
-#                         a visible window never does.
+#                         a visible window never does. The next call reopens it on its last page.
 #                         ab PORT js CODE runs agent-browser eval CODE; js - reads it from stdin.
 #                         ab PORT screenshot ... DIR/FILE.png creates DIR when the last argument is
 #                         an image path (any case), not a selector like text=a/b.png. Exits 3 when agent-browser
@@ -418,7 +418,7 @@ cmd_unwatched() {
     elif served "$port"; then
       say "dev-up: the unit on port $port runs but nothing listens on the port (log: $(f "$port" log))."
     else
-      say "dev-up: the server on port $port is down (log: $(f "$port" log)). Its state is cleared; run /dev-up $port to bring it back."
+      say "dev-up: the server on port $port is down (log: $(f "$port" log)). Its state is cleared; run /$SKILL $port to bring it back."
       last_fall "$port"
       rm -f "$sf" "$(f "$port" watch)" "$(f "$port" paused)" "$(f "$port" hookoff)" "$(f "$port" pid)"
       continue
@@ -443,7 +443,17 @@ cmd_unwatched() {
 # through ab_env, so each one carries the same options.
 ab_session() { say "devup-$1"; }
 ab_mode() { local m; m=$(state_get "$1" ab_mode); say "${m:-headless}"; }
-ab_alive() { agent-browser session list 2>/dev/null | grep -qw -- "$(ab_session "$1")"; }
+# grep without -q reads the whole list. grep -q leaves at the first match, agent-browser dies writing
+# the next line (SIGPIPE), and pipefail turns the match into "closed": 291 of 500 calls under load.
+ab_alive() { agent-browser session list 2>/dev/null | grep -w -- "$(ab_session "$1")" >/dev/null; }
+# agent-browser keeps the tab's last URL, without its query string, in SOCKETDIR/SESSION.target, and
+# the file outlives the daemon. Only a session that comes back reads it, so a live call pays nothing.
+ab_last_url() {
+  local dir url
+  dir=$(agent-browser session info --json 2>/dev/null | sed -n 's/.*"socketDir":"\([^"]*\)".*/\1/p')
+  url=$(sed -n 's/.*"url":"\([^"]*\)".*/\1/p' "$dir/$(ab_session "$1").target" 2>/dev/null)
+  case "$url" in "http://localhost:$1"/*) say "$url" ;; *) say "http://localhost:$1/" ;; esac
+}
 # Headless: DEV_UP_AB_HEADLESS, else the newest Playwright chrome-headless-shell (about half the RAM
 # of a full browser per session), else the env's AGENT_BROWSER_EXECUTABLE_PATH, else agent-browser's
 # own Chrome. Headed: DEV_UP_AB_HEADED, else the env's browser, else agent-browser's Chrome.
@@ -479,7 +489,7 @@ ab_env() {
 # and stays: 0 turns the timeout off. The daemon applies a changed value in place, without a relaunch.
 ab_idle() { if [ "$(ab_mode "$1")" = headed ]; then say 0; else say "${DEV_UP_AB_IDLE:-30m}"; fi; }
 cmd_ab() {
-  local port="$1" list a shot="" skip="" idle; shift
+  local port="$1" list a shot="" skip="" idle url; shift
   have agent-browser || die 3 "agent-browser is not on PATH"
   [ $# -gt 0 ] || die 2 "ab PORT <agent-browser command...>"
   # A version manager's shim with no binary behind it passes have and fails every call.
@@ -503,12 +513,14 @@ cmd_ab() {
     esac
   fi
   idle=$(ab_idle "$port")
-  # A dead daemon (idle timeout, a crash) would come back on about:blank for any command but open.
+  # A dead daemon (idle timeout, a crash) would come back on about:blank for any command but open,
+  # so it reopens on the last page it showed.
   case "$1" in
     open|goto|navigate|close|quit|exit|session|state|skills|dashboard|install|--*) ;;
     *) if ! say "$list" | grep -qw -- "$(ab_session "$port")"; then
-         say "dev-up: the session on port $port had closed; reopened it at http://localhost:$port/" >&2
-         ( ab_env "$port"; agent-browser --idle-timeout "$idle" open "http://localhost:$port/" >/dev/null 2>&1 )
+         url=$(ab_last_url "$port")
+         say "dev-up: the session on port $port had closed; reopened it at $url" >&2
+         ( ab_env "$port"; agent-browser --idle-timeout "$idle" open "$url" >/dev/null 2>&1 )
        fi ;;
   esac
   ( ab_env "$port"; exec agent-browser --idle-timeout "$idle" "$@" )
@@ -523,9 +535,10 @@ cmd_switch() {
     cmd_ab "$port" close >/dev/null 2>&1
   elif [ -d "$STATE_DIR/profiles/$port-$(ab_mode "$port")" ]; then
     # The session closed (idle timeout) after a login in its profile: read the profile back with
-    # no window, or the other mode opens logged out.
+    # no window, or the other mode opens logged out. It opens on the last page, which the switch keeps.
+    url=$(ab_last_url "$port")
     ( export DEV_UP_AB_NOWINDOW=1
-      cmd_ab "$port" open "http://localhost:$port/" >/dev/null 2>&1 &&
+      cmd_ab "$port" open "$url" >/dev/null 2>&1 &&
         cmd_ab "$port" state save "$auth" >/dev/null 2>&1 && chmod 600 "$auth"
       cmd_ab "$port" close >/dev/null 2>&1 )
   fi

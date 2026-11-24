@@ -18,6 +18,11 @@ Read this before driving the app. Every browser call is `S ab PORT <agent-browse
   `S ab PORT js 'window.innerWidth'`; `js -` reads a longer script from stdin. `js` runs
   agent-browser `eval` under another name, because a session isolated in a worktree refuses the
   word eval. The viewport is emulated, so it holds in headless and in a tiled window alike.
+- **Scroll and layout without `js`.** `S ab PORT scroll down 500` and
+  `S ab PORT scrollintoview @e3` scroll the page. `S ab PORT get box @e3` prints x, y, width and
+  height, and `S ab PORT get styles @e3 | grep -E '^(color|font-size):'` reads computed styles. In
+  938 sampled `js` calls, 29% only scrolled and 26% measured layout with `getBoundingClientRect`
+  or `getComputedStyle`.
 - **Client errors.** The watcher reads the server log only. React errors, failed fetches and page
   exceptions live in the browser: `S ab PORT errors`, `S ab PORT console`,
   `S ab PORT network requests --filter <pattern>` whenever the screen looks wrong or an action
