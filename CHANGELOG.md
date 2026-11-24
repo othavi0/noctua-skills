@@ -5,6 +5,26 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `dev-up-agent-browser`: quando o próprio user digita `/dev-up-agent-browser
+  PORTA`, a janela abre visível (`show`), e a palavra "headless" no pedido
+  mantém headless. Agente, workflow e subagente que usam a skill como prova
+  seguem headless. Em 21 chamadas do user de 10 a 24 de novembro, 13 pediam
+  "abre visualmente". A janela visível passa `--idle-timeout 0` em toda chamada
+  e não fecha mais por ociosidade, depois de 26 avisos "had closed; reopened"
+  nos transcripts. A sessão headless segue fechando em 30 minutos, e
+  `DEV_UP_AB_IDLE` troca esse prazo. O daemon aplica o valor novo sem relançar o
+  browser (medido: o mesmo pid e o mesmo `launchHash` antes e depois de 12 s
+  parado, com `DEV_UP_AB_IDLE=5s`). Entram `login PORTA [USUÁRIO]` e
+  `recipe [set 'CMD' [USUÁRIO] | rm]`. A receita de login de cada repo mora em
+  `~/.config/dev-up-ab/logins/`, com a URL do `origin` como chave, e todo
+  worktree e clone do repo acha a mesma. Ela guarda só um comando do projeto
+  que loga sem imprimir a senha, com `{port}` e `{user}`, e recusa comando com
+  senha. Sai a receita `fill @ref "$(jq ...)"`, que um hook barrou e a sessão
+  isolada em worktree recusa. Sem receita, o agente pede ao user para logar na
+  janela e oferece salvar uma. O `show` que falha diz o motivo do
+  agent-browser e se o servidor caiu. O `FAILED` de 17 de novembro era um
+  `ERR_CONNECTION_REFUSED`, porque o servidor tinha acabado de cair por OOM.
+
 - `dev-up` e `dev-up-agent-browser`: as duas skills levam o mesmo
   `scripts/dev-up.sh`, byte a byte, e cada eval falha com `cmp` quando as
   cópias divergem. Antes eram dois scripts de 384 e 548 linhas, e toda correção

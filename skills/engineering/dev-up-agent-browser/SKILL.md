@@ -2,7 +2,8 @@
 name: dev-up-agent-browser
 description: >-
   Runs this project's dev server on one port and drives the app through an agent-browser session
-  named after that port (headless, a visible window on request), with a log watcher. Use for
+  named after that port (a visible window when the user calls it, headless for agents), with a log
+  watcher and the repo's test login. Use for
   `/dev-up-agent-browser [port]`, when asked to test, click through or check a local app with
   agent-browser or headless, or when several agents test local apps at once on little RAM. Not for
   the user's own Chrome tab (dev-up), a public website (agent-browser) or an Expo app on a device
@@ -19,6 +20,9 @@ allowed-tools:
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh ab *)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh show *)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh hide *)
+  - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh login *)
+  - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh recipe)
+  - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh recipe *)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh dash)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh browser *)
 hooks:
@@ -57,12 +61,16 @@ session runs.
 ## Invocation
 
 - `/dev-up-agent-browser PORT`: steps 1 to 6.
+- The mode comes from who calls. **Visible** when the user's own message calls
+  `/dev-up-agent-browser` and does not say "headless". **Headless** in every other case: the user
+  said "headless", or another agent's brief, a workflow or a subagent runs the skill. A slash command
+  quoted inside an agent's brief is not the user's call.
 - A URL: its port is the key (80 or 443 when it has none); run step 4 with that URL. No server,
   watcher or state.
 - No argument: a `.state` of this checkout with a live port: use that port and say so in one line.
   No `dev` script in the folder: say there is nothing to run. Otherwise ask for the port.
-- Called inside other work as a proof step: run every step; the handback becomes one line in that
-  task's report.
+- Called inside other work as a proof step: run every step headless; the handback becomes one line in
+  that task's report.
 
 ## Gotchas
 
@@ -138,14 +146,22 @@ Done when `S state PORT show` prints `watcher_alive=yes`.
 
 ## 4. Open the session
 
-1. `S ab PORT open http://localhost:PORT/`.
+1. Visible: `S show PORT`. Headless: `S ab PORT open http://localhost:PORT/`. `show` prints
+   `SWITCHED`, or `FAILED` followed by agent-browser's reason; with `nothing listens on port PORT`
+   the server fell: back to step 1, then `S show PORT` again. The visible window never closes while
+   idle; a headless session closes after 30 minutes idle and `ab` reopens it on the next call.
 2. `S ab PORT get url`. On a login route (`/login`, `/auth`, `/sign-in`, `/entrar`, `/acesso`,
-   `/conta`): `S show PORT`, ask the user to log in in that window, and `S hide PORT` once they
-   confirm. The login travels with the switch and stays in the profile. One exception: when the
-   user asks you to log in as a seeded test user whose password sits in a local file of the repo,
-   fill the field from that file inside the command, so the value never reaches the transcript:
-   `S ab PORT fill @ref "$(jq -r '.KEY' FILE)"`. A session isolated in a worktree refuses the
-   `$(...)`; there, ask the user to log in.
+   `/conta`), when the user asked to log in or the task needs a logged-in page:
+   - `S login PORT [USER]` runs this repo's login recipe from the root of the current checkout.
+     Give `USER` only when the user named one, in the project's own naming (`teste-admin` for
+     "loga com admin" in crm-next); without it the recipe's default user logs in.
+     `LOGGED_IN user=U url=U`: check that the url left the login route.
+   - `NO_RECIPE` or `LOGIN_FAILED`: ask the user to log in in the window (headless: `S show PORT`
+     first, `S hide PORT` once they confirm; the login travels with the switch and stays in the
+     profile). After a `NO_RECIPE`, offer to save a recipe when the project has a command that logs
+     in without printing the password, and save it once the user agrees:
+     [login recipes](references/login.md).
+   Never type a password, put it in a command, or read the file that holds it.
 3. Smoke: `S ab PORT errors`, `S ab PORT console`, `S ab PORT network requests --filter /api` (or
    the app's data origin).
 4. Port in the title, so the dashboard and window lists name it: `S ab PORT js '<script>'` with
@@ -165,16 +181,17 @@ with `[PORT]`.
 - **Watch**: `S dash` starts agent-browser's dashboard once and prints its URL (default
   `http://localhost:4848`): every session streams live there with its console and network, and it
   costs no measurable RAM while nobody looks. Run it on every setup and put the URL in the handback.
-- **Take over**, only when the user asks to see or touch the page: `S show PORT` reopens the
-  session as a real window with cookies and storage carried over, also from a session that
-  closed while idle; `S hide PORT` returns to headless. The window carries the class `agent-browser`; to keep it from taking focus, read
+- **Take over** a headless session when the user asks to see or touch the page: `S show PORT`
+  reopens it as a real window with cookies and storage carried over, also from a session that
+  closed while idle; `S hide PORT` returns to headless, and to its idle timeout. The window
+  carries the class `agent-browser`; to keep it from taking focus, read
   [window focus](references/window-focus.md).
 
 ## 6. Hand back
 
 `S state PORT show` prints the watcher id and whether server, watcher and browser are alive. Report
 the port, the log path, the session `devup-PORT` and its mode, the dashboard URL, the watcher id,
-and the smoke result.
+the smoke result, and who is logged in (`LOGGED_IN`, the user, or nobody).
 
 ## Restart
 

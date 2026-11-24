@@ -8,7 +8,7 @@ HERE=$(cd "$(dirname "$0")/.." && pwd)
 DU="$HERE/scripts/dev-up.sh"
 T=$(mktemp -d); T=$(cd "$T" && pwd -P)
 export DEV_UP_CACHE="$T/cache" CLAUDE_CODE_SESSION_ID=session-a
-P=$((39000 + RANDOM % 20000)); P2=$((P + 1)); P3=$((P + 2)); P4=$((P + 3))
+P=$((39000 + RANDOM % 20000)); P2=$((P + 1)); P3=$((P + 2)); P4=$((P + 3)); P5=$((P + 4))
 fails=0
 check() { if [[ "$2" == $3 ]]; then echo "ok   $1"; else echo "FAIL $1: got '$2', want '$3'"; fails=$((fails + 1)); fi; }
 serve() { timeout 10 "$DU" serve "$@"; }
@@ -19,7 +19,7 @@ cleanup() {
     pkill -f "http.server $p" 2>/dev/null
   done
   [ -n "${WATCH:-}" ] && kill -- -"$WATCH" 2>/dev/null
-  command -v agent-browser >/dev/null && agent-browser --session "devup-$P" close >/dev/null 2>&1
+  command -v agent-browser >/dev/null && for p in $P $P5; do agent-browser --session "devup-$p" close >/dev/null 2>&1; done
   rm -rf "$T"
 }
 trap cleanup EXIT
@@ -53,6 +53,19 @@ chmod +x "$T/brokenab/agent-browser"
 out=$(PATH="$T/brokenab:$PATH" "$DU" ab $P get title 2>&1; echo "exit=$?")
 check "ab names an agent-browser that does not run and exits 3" "$out" "ERROR: agent-browser*does not run*mise ERROR*exit=3"
 check "and never claims it reopened the session" "$(printf '%s' "$out" | grep -c reopened)" "0"
+
+# Login recipes: one per repo, outside git, found from every worktree, never holding a password.
+git -C "$T/app" remote add origin https://github.com/dono/app.git
+git -C "$T/app" worktree add -q "$T/wt2" 2>/dev/null
+export DEV_UP_AB_CONFIG="$T/config"
+check "login without a recipe says so and exits 1" "$("$DU" login $P; echo "exit=$?")" "NO_RECIPE key=github.com/dono/app file=$T/config/logins/github.com_dono_app*exit=1"
+check "recipe set refuses a password" "$("$DU" recipe set 'login --password hunter2 {port}' 2>&1; echo "exit=$?")" "*exit=3"
+check "recipe set needs {port}" "$("$DU" recipe set 'sh login.sh' 2>&1; echo "exit=$?")" "*exit=2"
+"$DU" recipe set 'sh login.sh {port} {user}' 'teste admin' >/dev/null
+check "every worktree of the repo finds the same recipe" "$(cd "$T/wt2" && "$DU" recipe | head -1)" "RECIPE key=github.com/dono/app file=$T/config/logins/github.com_dono_app"
+check "an ssh origin in another case gets the same key" "$(git -C "$T/app" remote set-url origin git@github.com:Dono/App.git; "$DU" recipe | head -1)" "RECIPE key=github.com/dono/app *"
+check "the recipe file is private" "$(stat -c %a "$T/config/logins/github.com_dono_app")" "600"
+check "without DEV_UP_AB_CONFIG the recipe lives in XDG_CONFIG_HOME" "$(DEV_UP_AB_CONFIG='' XDG_CONFIG_HOME="$T/xdg" "$DU" recipe)" "NO_RECIPE key=* file=$T/xdg/dev-up-ab/logins/*"
 
 if command -v agent-browser >/dev/null; then
   export DEV_UP_AB_STATE="$T/abstate"
@@ -89,9 +102,43 @@ if command -v agent-browser >/dev/null; then
   ab close >/dev/null
   "$DU" hide $P >/dev/null
   check "hide after the window closed keeps the login" "$(ab js 'document.cookie')" "*sid=logado*"
+  check "show on a dead server names the reason" "$("$DU" show $P5 2>&1)" "FAILED mode=headed url=http://localhost:$P5/*ERR_CONNECTION_REFUSED*server is down*"
+  "$DU" state $P5 rm; agent-browser --session "devup-$P5" close >/dev/null 2>&1
+  unset DEV_UP_AB_NOWINDOW
+
+  cat >"$T/app/login.sh" <<EOF
+#!/bin/sh
+"$DU" ab "\$1" js "document.cookie='who=\$2; path=/'" >/dev/null && echo "entrou como \$2"
+EOF
+  pid2=$(bpid)
+  check "login runs the repo's recipe with the port and the default user" "$("$DU" login $P)" "LOGGED_IN user=teste admin url=http://localhost:$P/*entrou como teste admin"
+  check "the recipe drives the port's session" "$(ab js 'document.cookie')" "*who=teste admin*"
+  check "and the same browser" "$(bpid)" "$pid2"
+  check "login PORT USER overrides the default user" "$("$DU" login $P teste-vendedor | head -1)" "LOGGED_IN user=teste-vendedor *"
+  "$DU" recipe set 'echo got {user} {port}' >/dev/null
+  check "an & in the user is no shell operator" "$("$DU" login $P 'a&id&b' 2>&1 | grep -c '^uid=')" "0"
+  "$DU" recipe set 'echo nope {port}; exit 7' >/dev/null
+  check "a failing recipe says LOGIN_FAILED with its exit code" "$("$DU" login $P; echo "exit=$?")" "LOGIN_FAILED exit=7*nope $P*exit=1"
+  "$DU" recipe rm >/dev/null
+
+  # Idle: the headless session closes, the visible window never does, and keeps its browser.
+  ab close >/dev/null
+  export DEV_UP_AB_IDLE=3s
+  ab open "http://localhost:$P/" >/dev/null
+  sleep 6
+  check "a headless session closes after DEV_UP_AB_IDLE idle" "$("$DU" browser $P)" "*alive=no"
+  export DEV_UP_AB_NOWINDOW=1
+  "$DU" show $P >/dev/null
+  hpid() { pgrep -of "[u]ser-data-dir=$T/abstate/profiles/$P-headed"; }
+  hp1=$(hpid)
+  sleep 6
+  check "a visible session outlives the idle timeout" "$("$DU" browser $P)" "mode=headed *alive=yes"
+  check "with the browser show launched" "$(ab get title >/dev/null; hpid)" "$hp1"
+  unset DEV_UP_AB_IDLE
+  "$DU" hide $P >/dev/null
   unset DEV_UP_AB_NOWINDOW
   ab close >/dev/null
-  rm -f "$T/app/index.html"
+  rm -f "$T/app/index.html" "$T/app/login.sh"
 else
   echo "skip agent-browser checks (agent-browser is not on PATH)"
 fi
