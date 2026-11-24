@@ -5,7 +5,7 @@ description: >-
   you own on it, and arms a log watcher, without touching other servers or tabs. Use for
   `/dev-up [port]`, or when asked to start, run, serve, restart, open or watch this project's dev
   server on a port in the user's own browser. Not for headless or agent-browser testing
-  (dev-up-agent-browser), and not for an Expo app on a phone or emulator (mobile-up).
+  (dev-up-agent-browser).
 # argument-hint, allowed-tools and hooks are Claude Code fields, not part of the Agent Skills spec.
 # Drop them before uploading this folder to claude.ai or the Skills API.
 argument-hint: "[port]"

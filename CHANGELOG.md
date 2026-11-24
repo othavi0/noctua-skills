@@ -5,6 +5,12 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- Saem as skills `mobile-up` e `claude-md-prune`, a pedido do dono. Nos
+  transcripts de 10 a 24 de novembro a `mobile-up` não teve nenhum uso e a
+  `claude-md-prune` só rodou neste repo. As `description` da `dev-up` e da
+  `dev-up-agent-browser` deixam de citar a `mobile-up`, e o README passa a
+  dizer que as duas leem o nome da própria pasta.
+
 - `dev-up-agent-browser`: quando o próprio user digita `/dev-up-agent-browser
   PORTA`, a janela abre visível (`show`), e a palavra "headless" no pedido
   mantém headless. Agente, workflow e subagente que usam a skill como prova

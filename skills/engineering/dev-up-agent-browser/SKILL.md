@@ -6,8 +6,7 @@ description: >-
   watcher and the repo's test login. Use for
   `/dev-up-agent-browser [port]`, when asked to test, click through or check a local app with
   agent-browser or headless, or when several agents test local apps at once on little RAM. Not for
-  the user's own Chrome tab (dev-up), a public website (agent-browser) or an Expo app on a device
-  (mobile-up).
+  the user's own Chrome tab (dev-up) or a public website (agent-browser).
 # argument-hint, allowed-tools and hooks are Claude Code fields, not part of the Agent Skills spec.
 argument-hint: "[port]"
 allowed-tools:
