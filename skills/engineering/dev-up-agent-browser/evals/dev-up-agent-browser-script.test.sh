@@ -63,7 +63,7 @@ check "recipe set refuses a password" "$("$DU" recipe set 'login --password hunt
 check "recipe set needs {port}" "$("$DU" recipe set 'sh login.sh' 2>&1; echo "exit=$?")" "*exit=2"
 "$DU" recipe set 'sh login.sh {port} {user}' 'teste admin' >/dev/null
 check "every worktree of the repo finds the same recipe" "$(cd "$T/wt2" && "$DU" recipe | head -1)" "RECIPE key=github.com/dono/app file=$T/config/logins/github.com_dono_app"
-check "an ssh origin gets the same key" "$(git -C "$T/app" remote set-url origin git@github.com:dono/app.git; "$DU" recipe | head -1)" "RECIPE key=github.com/dono/app *"
+check "an ssh origin in another case gets the same key" "$(git -C "$T/app" remote set-url origin git@github.com:Dono/App.git; "$DU" recipe | head -1)" "RECIPE key=github.com/dono/app *"
 check "the recipe file is private" "$(stat -c %a "$T/config/logins/github.com_dono_app")" "600"
 check "without DEV_UP_AB_CONFIG the recipe lives in XDG_CONFIG_HOME" "$(DEV_UP_AB_CONFIG='' XDG_CONFIG_HOME="$T/xdg" "$DU" recipe)" "NO_RECIPE key=* file=$T/xdg/dev-up-ab/logins/*"
 
@@ -115,6 +115,8 @@ EOF
   check "the recipe drives the port's session" "$(ab js 'document.cookie')" "*who=teste admin*"
   check "and the same browser" "$(bpid)" "$pid2"
   check "login PORT USER overrides the default user" "$("$DU" login $P teste-vendedor | head -1)" "LOGGED_IN user=teste-vendedor *"
+  "$DU" recipe set 'echo got {user} {port}' >/dev/null
+  check "an & in the user is no shell operator" "$("$DU" login $P 'a&id&b' 2>&1 | grep -c '^uid=')" "0"
   "$DU" recipe set 'echo nope {port}; exit 7' >/dev/null
   check "a failing recipe says LOGIN_FAILED with its exit code" "$("$DU" login $P; echo "exit=$?")" "LOGIN_FAILED exit=7*nope $P*exit=1"
   "$DU" recipe rm >/dev/null
