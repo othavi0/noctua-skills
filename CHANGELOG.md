@@ -5,6 +5,18 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `humanize-pt-br`: o `scripts/scan.py` ganha 23 regras para formas fixas do
+  catálogo. Entram como marca "não se trata de X, trata-se de Y" e "mais do
+  que X, é Y" (17), a lista negativa 18, a abertura formulaica 3, o setup
+  retórico 25, a conclusão genérica 35, o hífen indevido 45 e as frases de
+  chatbot 46 a 49. Entram como aviso 5, 7, 16, 26, 27, 36, 39 e 41, o staccato
+  "Sem X. Sem Y." (23) e três formas do 17 ("e sim", "na verdade", "deixa de
+  ser"): um juiz independente escreveu 30 frases legítimas de PR, commit e
+  produto, e essas quatro regras barravam 6 delas quando eram marca. Antes o
+  scan pegava 1 de 28 frases novas com marca plantada; agora acha 24 de 28. Nos
+  31 `.md` do repo, fora o catálogo, as regras novas não acham nada. O formato
+  e o código de saída não mudam.
+
 - `nuvem`: o `fetch` baixa só os arquivos que a API marca `downloadable`. Os
   12 "download(s) failed" e os curl 22 com 400 de 10 a 14 de novembro eram todos
   o arquivo de apoio (`*-apoio.tar.gz`) que o próprio `start` envia. A API
