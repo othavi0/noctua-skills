@@ -223,8 +223,10 @@ fetch)
         failures=$((failures + 1))
       fi
     done < <(echo "$body" | jq -r '.data[] | select(.downloadable == true) | "\(.id) \(.filename)"')
-    page="$(echo "$body" | jq -r '.next_page // empty')"
-    [ -n "$page" ] || break
+    next="$(echo "$body" | jq -r '.next_page // empty')" || die "cannot read the files listing"
+    [ -n "$next" ] || break
+    [ "$next" != "$page" ] || die "the files listing repeated its cursor; stopped"
+    page="$next"
   done
   [ "$failures" -eq 0 ] || die "$failures download(s) failed; run fetch again before archiving"
   ;;
