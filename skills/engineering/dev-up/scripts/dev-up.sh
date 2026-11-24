@@ -452,6 +452,7 @@ ab_last_url() {
   local dir url
   dir=$(agent-browser session info --json 2>/dev/null | sed -n 's/.*"socketDir":"\([^"]*\)".*/\1/p')
   url=$(sed -n 's/.*"url":"\([^"]*\)".*/\1/p' "$dir/$(ab_session "$1").target" 2>/dev/null)
+  case "$url" in *[[:space:][:cntrl:]]*) url="" ;; esac
   case "$url" in "http://localhost:$1"/*) say "$url" ;; *) say "http://localhost:$1/" ;; esac
 }
 # Headless: DEV_UP_AB_HEADLESS, else the newest Playwright chrome-headless-shell (about half the RAM
