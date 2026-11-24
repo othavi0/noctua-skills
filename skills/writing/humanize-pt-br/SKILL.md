@@ -70,7 +70,7 @@ Procure **clusters** de marcas: marca isolada é escrita humana normal. Nunca re
 
 ## Referências
 
-- `scripts/scan.py`: o scan do passo 2. Marca 17, 18, 38 e setas; avisa 40, 43 e parte do léxico inflado. Ignora código e texto entre aspas.
+- `scripts/scan.py`: o scan do passo 2. Marca 3, 17, 18, 23 ("Sem X. Sem Y."), 25, 35, 38, 45 a 49 e setas, nas formas fixas do catálogo. Avisa 5, 7, 16, 26, 27, 36, 39, 40, 41, 43 e parte do léxico inflado (1, 4). Ignora código e texto entre aspas. Marca que pede julgamento (tripla, nominalização, aforismo, staccato sem "Sem", doc que narra o diff) fica para a releitura do passo 3.
 - `references/patterns-pt-br.md` (38 mil caracteres): as 49 marcas com antes e depois, falsos positivos e sinais de escrita humana. Carregue nos casos do passo 1. Corpo de PR, issue e comentário técnico não precisam dele.
 - `references/voz-e-ritmo.md`: voz, gate de gênero, calibração por amostra, Strunk. Carregue ao devolver voz ou calibrar por amostra.
 - `references/pontuacao.md`: rubrica de 5 dimensões. Carregue só quando o usuário pedir nota.
