@@ -5,18 +5,17 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
-- `humanize-pt-br`: o `scripts/scan.py` pega as formas fixas de mais 24
-  marcas do catálogo. Entram como marca as variantes do contraste 17 ("não se
-  trata de X, trata-se de Y", "deixa de ser X e passa a ser Y", "não X, e sim
-  Y", "mais do que X, é Y", "parece X. Na verdade é Y"), a lista negativa 18, a
-  abertura formulaica 3, o staccato "Sem X. Sem Y." (23), o setup retórico 25, a
-  conclusão genérica 35, o hífen indevido 45 e as frases de chatbot 46 a 49.
-  Entram como aviso 5, 7, 16, 26, 27, 36, 39 e 41, que têm uso legítimo. Antes o
-  scan pegava 9 de 33 frases plantadas com uma marca mecânica cada, e 1 de 28
-  frases novas escritas depois. Agora pega 33 de 33 e 24 de 28. Nos 31 `.md`
-  do repo, fora o catálogo, as regras novas não acham nada, e os 228 achados
-  das regras antigas continuam os mesmos. Nas 16 frases limpas de teste, o scan
-  dá 0 achados. O formato de saída e o código de saída não mudam.
+- `humanize-pt-br`: o `scripts/scan.py` ganha 23 regras para formas fixas do
+  catálogo. Entram como marca "não se trata de X, trata-se de Y" e "mais do
+  que X, é Y" (17), a lista negativa 18, a abertura formulaica 3, o setup
+  retórico 25, a conclusão genérica 35, o hífen indevido 45 e as frases de
+  chatbot 46 a 49. Entram como aviso 5, 7, 16, 26, 27, 36, 39 e 41, o staccato
+  "Sem X. Sem Y." (23) e três formas do 17 ("e sim", "na verdade", "deixa de
+  ser"): um juiz independente escreveu 30 frases legítimas de PR, commit e
+  produto, e essas quatro regras barravam 6 delas quando eram marca. Antes o
+  scan pegava 1 de 28 frases novas com marca plantada; agora acha 24 de 28. Nos
+  31 `.md` do repo, fora o catálogo, as regras novas não acham nada. O formato
+  e o código de saída não mudam.
 
 - `nuvem`: o `fetch` baixa só os arquivos que a API marca `downloadable`. Os
   12 "download(s) failed" e os curl 22 com 400 de 10 a 14 de novembro eram todos

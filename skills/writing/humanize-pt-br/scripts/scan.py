@@ -40,12 +40,12 @@ NO_TEXTO = [
     (MARCA, "17 não só", r"(?i)\bnão (?:só|apenas|somente)\b[^.!?\n]{1,80}\bmas\b"),
     (MARCA, "18 Não porque", r"\bNão porque\b"),
     (MARCA, "17 trata-se de", r"(?i)\bnão se trata\b[^.!?\n]{1,80}[.,;]\s+trata-se\b"),
-    (MARCA, "17 deixa de ser", r"(?i)\bdeixa(?:m|r)? de ser\b[^.!?\n]{1,80}\be passa(?:m|r)? a ser\b"),
-    (MARCA, "17 e sim", r"(?i)\bnão\b[^.!?\n]{1,80},\s+e sim\b"),
+    (AVISO, "17 deixa de ser", r"(?i)\bdeixa(?:m|r)? de ser\b[^.!?\n]{1,80}\be passa(?:m|r)? a ser\b"),
+    (AVISO, "17 e sim", r"(?i)\bnão\b[^.!?\n]{1,80},\s+e sim\b"),
     (MARCA, "17 mais do que", r"(?im)(?:^|[.!?]\s+)mais do que\b[^.!?\n]{1,60},\s+(?:é|são)\b"),
-    (MARCA, "17 na verdade", r"(?i)\bparece\b[^.!?\n]{1,60}[.,]\s+na verdade,?\s+(?:é|são)\b"),
+    (AVISO, "17 na verdade", r"(?i)\bparece\b[^.!?\n]{1,60}[.,]\s+na verdade,?\s+(?:é|são)\b"),
     (MARCA, "18 lista negativa", r"(?i)\bnão é\b[^.!?\n]{1,60}\.\s+não é\b"),
-    (MARCA, "23 staccato", r"(?m)(?:^|[.!?]\s+)Sem [^.!?,\n]{1,30}\.\s+Sem [^.!?,\n]{1,30}\."),
+    (AVISO, "23 staccato", r"(?m)(?:^|[.!?]\s+)Sem [^.!?,\n]{1,30}\.\s+Sem [^.!?,\n]{1,30}\."),
     (AVISO, "17 , não X.", r", não (?:o|a|os|as|no|na|do|da|em|um|uma)\b[^.,;\n]{1,40}\."),
 ]
 
