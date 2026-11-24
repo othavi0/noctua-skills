@@ -6,7 +6,9 @@ Read this before driving the app. Every browser call is `S ab PORT <agent-browse
 - **Refs first.** `S ab PORT snapshot -i` lists the interactive elements with refs (`@e3`). Act
   through refs: `S ab PORT click @e3`, `S ab PORT fill @e5 "text"`. After a click that changes the
   DOM, take a fresh snapshot, since the old refs point at gone elements.
-- **Screenshots for layout.** `S ab PORT screenshot /path/file.png`, then read the file. Text and
+- **Screenshots for layout.** `S ab PORT screenshot /path/file.png`, then read the file. When the
+  last argument is an image path (`.png`, `.jpg`, `.jpeg` or `.webp`, in any case), `ab` creates
+  its folder; a selector such as `text=a/b.png` gets no folder. Text and
   refs come cheaper from `snapshot` and `get text`; keep the image for layout, CSS and render
   checks.
 - **Navigation settles before you read it.** A click on an SPA link changes the URL a moment

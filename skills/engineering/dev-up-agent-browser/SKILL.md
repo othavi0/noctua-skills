@@ -13,6 +13,7 @@ allowed-tools:
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh owner *)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh preflight *)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh wait *)
+  - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh logs *)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh watch *)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh state *)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh ab *)
@@ -108,12 +109,15 @@ Done when `S state PORT show` prints this checkout's `dir`.
 4. `S serve PORT --dir <app dir> -- '<dev command>'` in a foreground Bash call. It starts the
    systemd user unit `dev-up-PORT` with this shell's environment, capped at 4G of RAM and 1G of
    swap. `--mem SIZE` and `--swap SIZE` change the caps; `--mem none` lifts both, only when the
-   user asks. After
+   user asks. A server that exits with a failure (an error exit, `oom-kill`) starts again by
+   itself, at most 5 starts in 10 minutes, and each fall logs a `dev-up: server exited result=...`
+   line. After
    editing `.env` this session, prefix the command with `set -a; . ./.env; set +a;`.
 5. `S wait PORT` in a foreground Bash call with `timeout: 600000`.
 
 Done when `wait` prints `READY`. Any other verdict comes with the log tail: read it, then
-[troubleshooting](references/troubleshooting.md).
+[troubleshooting](references/troubleshooting.md). `S logs PORT [N]` prints the last N lines of
+the log (default 40).
 
 ## 3. Arm the watcher
 
@@ -127,7 +131,8 @@ description `errors on port PORT`, `timeout_ms: 1800000`. Its return reads `Moni
   `DeprecationWarning`): ignore it. A recurring harmless line: `S state PORT exclude '<text>'`,
   `TaskStop` the watcher, re-arm. HMR errors stay reported: after an edit they are real bugs.
 - Before you or a subagent edits code this server serves, installs deps or migrates: `TaskStop` the
-  watcher and `S state PORT pause`; re-arm when that round is green.
+  watcher and `S state PORT pause`; re-arm when that round is green, or `S state PORT resume`
+  to leave the reporting to the hook.
 
 Done when `S state PORT show` prints `watcher_alive=yes`.
 
