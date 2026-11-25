@@ -2,7 +2,7 @@
 
 [![skills.sh](https://skills.sh/b/othavi0/noctua-skills)](https://skills.sh/othavi0/noctua-skills)
 
-Four Claude Code skills I use every day, packaged to drop into any project. Each
+Five Claude Code skills I use every day, packaged to drop into any project. Each
 one started as a bug I hit twice, and gets cut the moment it stops earning its
 place.
 
@@ -25,7 +25,7 @@ Claude Code.
 Prefer to install by hand? Clone the repo and copy a skill folder into
 `~/.claude/skills` (global) or `.claude/skills` (one project).
 
-`dev-up`, `dev-up-agent-browser` and `nuvem` are model-invoked. Type them as a slash command
+`dev-up`, `dev-up-agent-browser`, `use-agent-desktop` and `nuvem` are model-invoked. Type them as a slash command
 (`/dev-up 3000`) or let Claude reach for them when the task fits the description.
 `humanize-pt-br` runs only when you type it.
 
@@ -55,6 +55,22 @@ measured on a 16 GB machine. `dash` streams every session live in one page,
 relaunches the browser whenever two calls disagree on their launch options, and
 the window that comes back steals your focus. On Hyprland, one window rule
 keeps the visible window from ever pulling you to its workspace.
+
+**[use-agent-desktop](./skills/engineering/use-agent-desktop/SKILL.md)** exists
+because a Wayland desktop has one keyboard, and it is yours.
+[agent-desktop](https://agent-browser.dev/desktop) reads and clicks a native app
+through the accessibility bus, but on Hyprland it refuses keys, the pointer and a
+screenshot of one window. The workaround, giving the app's window the focus and
+typing, sent `81/9` plus Enter into the terminal I was working in. The skill
+keeps agent-desktop for reading and clicking, and runs the app inside its own
+[cage](https://github.com/cage-kiosk/cage) compositor, which has a keyboard of
+its own: headless by default, so nothing shows on your screen, or as a window
+when you want to watch. A small script types with `wtype` and takes screenshots
+with `grim`, and it refuses every call whose socket is not a live cage or is
+your own display. It renders on the GPU and sizes the output to the app, so a
+screenshot shows the app the way you would see it. An idle headless session
+measured 0% CPU. Linux on Wayland, with `agent-desktop`, `cage`, `wtype` and
+`grim`.
 
 **[nuvem](./skills/engineering/nuvem/SKILL.md)** exists because a build, an E2E
 run and a before-and-after measurement do not fit on a laptop that is also running

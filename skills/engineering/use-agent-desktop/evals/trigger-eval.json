@@ -1,0 +1,18 @@
+[
+  {"query": "/use-agent-desktop calc -- omacalc", "should_trigger": true},
+  {"query": "abre a calculadora em segundo plano, digita 81/9 e me manda o print do resultado", "should_trigger": true},
+  {"query": "test the Qt settings dialog of my app without stealing my keyboard while I work", "should_trigger": true},
+  {"query": "roda o app GTK que eu compilei, clica em Salvar e tira print para evidência", "should_trigger": true},
+  {"query": "the keys you sent to the app ended up in my terminal, find a way to type into it safely", "should_trigger": true},
+  {"query": "drive this Electron app headless and screenshot each step", "should_trigger": true},
+  {"query": "abre o app desktop numa janela separada para eu acompanhar enquanto você clica e digita nele", "should_trigger": true},
+  {"query": "preciso de evidência em imagem de que o botão Exportar do app desktop funciona", "should_trigger": true},
+  {"query": "/dev-up-agent-browser 3000", "should_trigger": false},
+  {"query": "scrape the prices from this website", "should_trigger": false},
+  {"query": "muda o tema do Omarchy para catppuccin", "should_trigger": false},
+  {"query": "add a keybinding for Super+E in Hyprland", "should_trigger": false},
+  {"query": "take a screenshot of my whole screen", "should_trigger": false},
+  {"query": "test the login page of the web app on port 5173", "should_trigger": false},
+  {"query": "build a new Qt calculator app for Omarchy", "should_trigger": false},
+  {"query": "why did my app crash with a segfault", "should_trigger": false}
+]
