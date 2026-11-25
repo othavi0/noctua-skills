@@ -5,6 +5,24 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `use-agent-desktop`: skill nova. Usa o `agent-desktop` para ler e clicar num
+  app de desktop e roda o app dentro de um compositor `cage` próprio, que tem
+  teclado próprio, para o agente digitar e tirar print sem mexer no foco, no
+  cursor nem no teclado do usuário. Em 24 de novembro, um teste que emprestava
+  o foco à janela do app e digitava com `wtype` mandou `81/9` e Enter para o
+  terminal em uso. No Hyprland 0.57.2, `send_shortcut`, `send_key_state` e
+  `agent-desktop press` não chegaram a uma janela sem foco. O `scripts/cage.sh`
+  tem `start`, `type`, `key`, `shot`, `status` e `stop`. O `type`, o `key` e o
+  `shot` respondem `REFUSED` e saem com 3 quando o socket da sessão não é de um
+  `cage` vivo ou é o `WAYLAND_DISPLAY` de quem chama. O modo padrão é headless
+  e renderiza pela GPU: a sessão ociosa mediu 0% de CPU e 92 MB no `cage`. O
+  `--visible` abre o `cage` como janela, flutuante e sem foco no Hyprland, e
+  mediu 5,4% de CPU e 93 MB. O `--size WxH` dá à saída o formato do app, porque
+  o `cage` estica o app na saída inteira e o padrão de 1280x720 deformava uma
+  calculadora de 420x640. No headless o `--size` depende do `wlr-randr`; sem
+  ele o `start` avisa e mantém 1280x720. O `evals/cage-script.test.sh` cobre 32
+  casos com `cage`, `wtype`, `grim` e `wlr-randr` falsos.
+
 - `dev-up-agent-browser`: a sessão headless que fecha por ociosidade volta na
   última página que mostrava, e não mais na raiz. Nos transcripts de 10 a 24 de
   novembro houve 26 avisos "had closed; reopened it at http://localhost:N/". O
