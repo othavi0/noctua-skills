@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# cage.sh: the mechanical half of the use-agent-desktop skill. One desktop app per session, each
+# cage.sh: the mechanical half of the agent-desktop-omarchy skill. One desktop app per session, each
 # inside its own cage compositor. A cage has its own keyboard and its own Wayland socket, so keys
 # typed into it cannot reach the user's desktop.
 #
@@ -29,13 +29,15 @@
 # belongs to a live cage, and differs from the WAYLAND_DISPLAY of the caller. That check is the
 # reason this script exists: wtype with the wrong socket types into the user's focused window.
 #
-# State: $AGENT_DESKTOP_CAGE_HOME (default ~/.cache/use-agent-desktop) holds NAME.sock, NAME.pid, NAME.mode,
+# State: $AGENT_DESKTOP_CAGE_HOME (default ~/.cache/agent-desktop-omarchy) holds NAME.sock, NAME.pid, NAME.mode,
 # NAME.log and NAME.launch.sh.
 set -uo pipefail
 
-D=${AGENT_DESKTOP_CAGE_HOME:-$HOME/.cache/use-agent-desktop}
+D=${AGENT_DESKTOP_CAGE_HOME:-$HOME/.cache/agent-desktop-omarchy}
 RT=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
 HOST=${WAYLAND_DISPLAY:-}
+# The evals point this at a missing name to test a machine without wlr-randr.
+RANDR=${AGENT_DESKTOP_CAGE_RANDR:-wlr-randr}
 
 die() {
 	echo "$*" >&2
@@ -126,10 +128,10 @@ cmd_start() {
 	fi
 	local warn=""
 	if [[ $mode == headless && -n $size ]]; then
-		if command -v wlr-randr >/dev/null 2>&1; then
+		if command -v "$RANDR" >/dev/null 2>&1; then
 			local out
-			out=$(WAYLAND_DISPLAY=$sock wlr-randr | awk 'NR==1{print $1}')
-			WAYLAND_DISPLAY=$sock wlr-randr --output "$out" --custom-mode "$size" >/dev/null 2>&1 || warn="wlr-randr refused $size"
+			out=$(WAYLAND_DISPLAY=$sock "$RANDR" | awk 'NR==1{print $1}')
+			WAYLAND_DISPLAY=$sock "$RANDR" --output "$out" --custom-mode "$size" >/dev/null 2>&1 || warn="wlr-randr refused $size"
 		else
 			warn="wlr-randr is not installed, so the output stays 1280x720"
 		fi
@@ -146,7 +148,9 @@ cmd_type() {
 	[[ $# -ge 2 ]] || die "cage.sh: type NAME TEXT"
 	need wtype
 	guard "$name"
-	WAYLAND_DISPLAY=$SOCK wtype -- "$2" || {
+	# -s 300: an app loses the first shifted character that a new virtual keyboard sends at once.
+	# "Noctua" arrived as "octua" in 4 of 8 runs without the pause and in 0 of 8 with it.
+	WAYLAND_DISPLAY=$SOCK wtype -s 300 -- "$2" || {
 		echo "FAILED name=$name"
 		return 1
 	}
@@ -166,6 +170,7 @@ cmd_key() {
 		IFS=+ read -r -a part <<<"$key"
 		last=${part[-1]}
 		unset 'part[-1]'
+		((${#part[@]})) && args+=(-s 300)
 		for m in "${part[@]}"; do args+=(-M "$m"); done
 		if [[ ${#last} == 1 ]]; then args+=(-- "$last"); else args+=(-k "$last"); fi
 		# wtype releases every held modifier when it exits, so each KEY gets its own call.
