@@ -51,12 +51,12 @@ check "status lists the live session" "$(run status)" "name=calc alive=yes mode=
 
 out=$(run type calc "-8*2")
 check "type reports the character count" "$out" "TYPED name=calc chars=4"
-check "type sends the text to the session's socket, after --" "$(tail -n 1 "$T/wtype.log")" "display=$sock args=-- -8\*2"
+check "type sends the text to the session's socket, after a pause and --" "$(tail -n 1 "$T/wtype.log")" "display=$sock args=-s 300 -- -8\*2"
 
 run key calc Return ctrl+a ctrl+shift+Tab x >/dev/null
 check "a named key goes through -k" "$(sed -n 2p "$T/wtype.log")" "display=$sock args=-k Return"
-check "a modifier and one character" "$(sed -n 3p "$T/wtype.log")" "display=$sock args=-M ctrl -- a"
-check "two modifiers and a named key" "$(sed -n 4p "$T/wtype.log")" "display=$sock args=-M ctrl -M shift -k Tab"
+check "a modifier and one character" "$(sed -n 3p "$T/wtype.log")" "display=$sock args=-s 300 -M ctrl -- a"
+check "two modifiers and a named key" "$(sed -n 4p "$T/wtype.log")" "display=$sock args=-s 300 -M ctrl -M shift -k Tab"
 check "one character alone" "$(sed -n 5p "$T/wtype.log")" "display=$sock args=-- x"
 
 out=$(run shot calc "$T/out/proof.png")
@@ -78,7 +78,7 @@ check "no refused call reached wtype" "$(wc -l <"$T/wtype.log")" "$lines"
 echo "$sock" >"$T/home/calc.sock"
 
 # --size on a headless session goes through wlr-randr, and says so when it is missing.
-out=$(run start sized --size 420x640 -- sleep 300)
+out=$(AGENT_DESKTOP_CAGE_RANDR=no-such-wlr-randr run start sized --size 420x640 -- sleep 300)
 check "headless --size without wlr-randr keeps 1280x720" "$(sed -n 1p <<<"$out")" "STARTED name=sized mode=headless size=1280x720 *"
 check "and warns about it" "$(sed -n 2p <<<"$out")" "warn wlr-randr is not installed*"
 run stop sized >/dev/null

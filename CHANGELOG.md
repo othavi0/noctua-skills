@@ -5,6 +5,18 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `agent-desktop-omarchy`: novo nome da `use-agent-desktop`, porque o modo
+  visível e a instalação dos pacotes dependem do Hyprland e do Omarchy. O
+  estado passa a ficar em `~/.cache/agent-desktop-omarchy/`. O `type` espera
+  300 ms antes da primeira tecla: sem a espera, "Noctua" chegou como "octua" em
+  4 de 8 execuções num diálogo GTK e também num app Electron; com ela, em 0 de
+  8. O `key` faz a mesma espera quando a tecla leva modificador. O `SKILL.md`
+  ganha o que o teste com GTK e Electron mostrou: app GTK entra no barramento
+  de acessibilidade sem flag, e app Electron só entrou com
+  `ACCESSIBILITY_ENABLED=1` e `--force-renderer-accessibility`. O `--size` no
+  headless agora tem teste real com o `wlr-randr` 0.5.0: o print da calculadora
+  saiu em 420x640.
+
 - `use-agent-desktop`: skill nova. Usa o `agent-desktop` para ler e clicar num
   app de desktop e roda o app dentro de um compositor `cage` próprio, que tem
   teclado próprio, para o agente digitar e tirar print sem mexer no foco, no

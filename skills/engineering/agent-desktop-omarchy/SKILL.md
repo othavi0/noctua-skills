@@ -1,9 +1,9 @@
 ---
-name: use-agent-desktop
+name: agent-desktop-omarchy
 description: >-
-  Drives a native desktop app on Wayland with agent-desktop for reading and clicking, and a small
-  cage shell for the parts agent-desktop refuses there (keyboard, screenshots), without touching
-  the user's focus, cursor or keyboard. Use for `/use-agent-desktop`, when asked to test, drive or
+  Drives a native desktop app on Omarchy (Hyprland, Wayland) with agent-desktop for reading and
+  clicking, and a small cage shell for the parts agent-desktop refuses there (keyboard,
+  screenshots), without touching the user's focus, cursor or keyboard. Use for `/agent-desktop-omarchy`, when asked to test, drive or
   screenshot a desktop app (Qt, GTK, Electron) in the background or for evidence, or when keys
   sent to a window landed in the user's own window. Not for a web page (agent-browser,
   dev-up-agent-browser) or for changing desktop settings (omarchy).
@@ -13,7 +13,7 @@ allowed-tools:
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/cage.sh *)
 ---
 
-# use-agent-desktop
+# agent-desktop-omarchy
 
 [agent-desktop](https://agent-browser.dev/desktop) reads an app's controls and clicks them through
 the accessibility bus. On a Wayland session outside GNOME it refuses the rest: `press`, pointer
@@ -86,7 +86,7 @@ report a layout as broken.
 ## Evidence
 
 Save the screenshots that prove a result where the task keeps its evidence, not in the state
-directory: `~/.cache/use-agent-desktop/` is a cache. Name each file after what it proves. Report
+directory: `~/.cache/agent-desktop-omarchy/` is a cache. Name each file after what it proves. Report
 the absolute path of each file.
 
 ## Gotchas
@@ -95,8 +95,13 @@ the absolute path of each file.
   22 MB with `WLR_RENDERER=pixman`. A visible one measured 5.4% CPU and 93 MB. The app's own
   memory comes on top. Stop a session when its check ends.
 - A Qt app joins the accessibility bus only when `QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1` is set at
-  launch. `C start` sets it. A Chromium or Electron app needs its own flag: see
-  `agent-desktop skills get agent-desktop-linux references/troubleshooting.md`.
+  launch. `C start` sets it. A GTK app joins with no flag.
+- An Electron app joined the bus only as
+  `C start NAME -- env ACCESSIBILITY_ENABLED=1 electron --ozone-platform=wayland --force-renderer-accessibility APPDIR`.
+  With the flag alone it rendered and took keys, but `agent-desktop list-apps` did not list it.
+  It lists as `electron`. Give its `snapshot` a `--timeout-ms 8000`: the tree fills late.
+- `C type` pauses 300 ms before the first key. Without the pause, an app dropped the first
+  capital letter of the text in 4 of 8 runs.
 - Two sessions of the same app share one name on the accessibility bus, and `agent-desktop` cannot
   tell them apart. Run one session per app when the task needs clicks.
 - A click by screen coordinate has no command here. `agent-desktop` refuses pointer input on

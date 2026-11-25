@@ -1,5 +1,5 @@
 [
-  {"query": "/use-agent-desktop calc -- omacalc", "should_trigger": true},
+  {"query": "/agent-desktop-omarchy calc -- omacalc", "should_trigger": true},
   {"query": "abre a calculadora em segundo plano, digita 81/9 e me manda o print do resultado", "should_trigger": true},
   {"query": "test the Qt settings dialog of my app without stealing my keyboard while I work", "should_trigger": true},
   {"query": "roda o app GTK que eu compilei, clica em Salvar e tira print para evidência", "should_trigger": true},
