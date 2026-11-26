@@ -133,7 +133,17 @@ printf 'DEV_UP_ENVPORT=%s\n' "$P" >"$T/app/.env"
 serve $P -- 'X=v; echo "x=${X} pid=$$"; set -a; . ./.env; set +a; exec python3 -m http.server ${DEV_UP_ENVPORT}' >/dev/null 2>&1
 check "the port read from .env reaches the server" "$("$DU" wait $P | head -1)" "READY http=200"
 check "bash, not systemd, expands \${VAR} and \$\$" "$(grep '^x=' "$DEV_UP_CACHE/$P.log")" "x=v pid=[0-9]*"
+# A daemon-reload rewrites the transient unit. systemd 262 doubled every $$ in it, so the unit's
+# bash read $$DEV_UP_LOG as its pid plus a name and wrote a stray file in the app's directory.
+systemctl --user daemon-reload
+kill -KILL "$(pgrep -f "http.server $P" | head -1)"
+for _ in $(seq 40); do [ "$(grep -c '^x=v pid=[0-9]' "$DEV_UP_CACHE/$P.log")" -ge 2 ] && break; sleep 0.25; done
+check "after a daemon-reload, a fall logs its real result" "$(grep '^dev-up: server exited' "$DEV_UP_CACHE/$P.log")" "dev-up: server exited result=signal code=killed status=KILL"
+check "and bash still expands the command on the restart" "$(grep -c '^x=v pid=[0-9]' "$DEV_UP_CACHE/$P.log")" "2"
+"$DU" wait $P >/dev/null
 "$DU" stop $P >/dev/null
+check "a stop after a daemon-reload logs nothing and leaves no file in the app" "$(grep -c '^dev-up: server exited' "$DEV_UP_CACHE/$P.log") $(ls "$T/app" | grep -c 'DEV_UP\|SERVICE_RESULT')" "1 0"
+check "stop removes the command file" "$(ls "$DEV_UP_CACHE/$P.cmd" 2>/dev/null)" ""
 
 echo 30 >"$DEV_UP_CACHE/$P.hookoff"
 serve $P -- "echo 'ReferenceError: x is not defined at boot'; exec python3 -m http.server $P" >/dev/null 2>&1

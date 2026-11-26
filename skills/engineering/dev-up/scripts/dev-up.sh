@@ -58,6 +58,7 @@
 # worktree and clone of a repo finds the same one. Lines: cmd=CMD and an optional user=DEFAULT.
 #
 # Files in ~/.cache/dev-up (dev-up) or ~/.cache/dev-up-ab (dev-up-agent-browser): PORT.log,
+# PORT.cmd (the command serve started, which the unit reads),
 # PORT.state (session dir watcher_task, plus tab_id or ab_mode), PORT.watch (watch), PORT.paused,
 # PORT.exclude (fixed strings, one per line), PORT.hookoff (log offset at the last prompt).
 # Exit codes: 0 ok, 1 negative verdict, 2 usage, 3 refused.
@@ -252,23 +253,40 @@ cmd_serve() {
   # used to leave the port dead. Both come back; a server that falls 5 times in 10 minutes, fast
   # or slow, stays down. ExecStopPost logs why each run ended, except a clean exit and a stop
   # (cmd_stop leaves PORT.stopping while it runs).
+  # Neither Exec line carries a $: a daemon-reload rewrites the transient unit with every $$
+  # doubled (systemd 262), and the unit's bash then read $$NAME as its pid followed by NAME. The
+  # command waits in PORT.cmd, and both lines call this script with the port.
+  local self="${SELF:-$0}"
+  case "$self" in *[\$\"\\%]*) die 3 "serve: this script's path has a character systemd would expand: $self" ;; esac
+  ( umask 077; printf '%s\n' "$*" >"$(f "$port" cmd)" ) || die 3 "cannot write $(f "$port" cmd)"
   local -a env=() props=(-p TimeoutStopSec=10 -p Restart=on-failure -p RestartSec=1
     -p StartLimitIntervalSec=600 -p StartLimitBurst=5
-    -p "ExecStopPost=$(command -v bash) -c '[ \"\$\$SERVICE_RESULT\" = success ] || [ -e \"\$\$DEV_UP_STOPPING\" ] || echo \"dev-up: server exited result=\$\$SERVICE_RESULT code=\$\$EXIT_CODE status=\$\$EXIT_STATUS\" >>\"\$\$DEV_UP_LOG\"'")
+    -p "ExecStopPost=$(command -v bash) \"$self\" _exited $port")
   for v in $(compgen -e); do env+=(--setenv="$v"); done
-  env+=(--setenv="DEV_UP_LOG=$log" --setenv="DEV_UP_STOPPING=$(f "$port" stopping)")
   rm -f "$(f "$port" stopping)"
   # Capped by default: an uncapped dev server grew past 5 GiB of RAM and kept 2 to 3 GiB in swap
   # (measured on two servers, 11 Nov 2026), and four of them left the machine without memory. With
   # MemoryMax alone the server spills into swap without limit, so the swap gets its own ceiling.
   [ -n "$mem" ] && [ "$mem" != none ] && props+=(-p "MemoryMax=$mem" -p "MemorySwapMax=$swap")
-  # systemd expands ${VAR} and $$ in ExecStart before bash runs; $$ is its escape for a literal $.
-  c="exec >>$(q "$log") 2>&1; $*"
   systemctl --user reset-failed "$(unit "$port")" 2>/dev/null
   systemd-run --user --quiet --collect --unit="$(unit "$port")" --working-directory="$PWD" \
-    "${env[@]}" "${props[@]}" -- bash -c "${c//\$/\$\$}" \
+    "${env[@]}" "${props[@]}" -- bash "$self" _run "$port" \
     || die 3 "systemd-run could not start $(unit "$port")"
   say "STARTED unit=$(unit "$port") log=$log"
+}
+
+# The two commands the unit itself runs. _run is ExecStart, _exited is ExecStopPost, where systemd
+# sets SERVICE_RESULT, EXIT_CODE and EXIT_STATUS.
+cmd_run() {
+  local c; c=$(cat "$(f "$1" cmd)") || exit 3
+  exec >>"$(f "$1" log)" 2>&1
+  eval "$c"
+}
+
+cmd_exited() {
+  [ "${SERVICE_RESULT:-}" = success ] && return 0
+  [ -e "$(f "$1" stopping)" ] && return 0
+  say "dev-up: server exited result=${SERVICE_RESULT:-} code=${EXIT_CODE:-} status=${EXIT_STATUS:-}" >>"$(f "$1" log)"
 }
 
 cmd_wait() {
@@ -337,6 +355,7 @@ cmd_stop() {
   fi
   for i in $(seq 20); do
     if ! bound "$port" && ! served "$port"; then
+      rm -f "$(f "$port" cmd)"
       if orphan "$cwd"; then say "STOPPED orphan pid=$lp cwd=$cwd"; else say STOPPED; fi
       return 0
     fi
@@ -620,22 +639,24 @@ cmd_dash() {
 cmd_browser() { ( ab_env "$1"; say "mode=$(ab_mode "$1") session=$AGENT_BROWSER_SESSION exe=${AGENT_BROWSER_EXECUTABLE_PATH:-} profile=$AGENT_BROWSER_PROFILE alive=$(ab_alive "$1" && echo yes || echo no)" ); }
 
 cmd="${1:-}"; [ $# -gt 0 ] && shift
-if [ "$cmd" != unwatched ] && [ -n "$SELF" ] && [ "$SELF" != "$CACHE/dev-up.sh" ]; then
+if [ "$cmd" != unwatched ] && [ "$cmd" != _run ] && [ "$cmd" != _exited ] && [ -n "$SELF" ] && [ "$SELF" != "$CACHE/dev-up.sh" ]; then
   mkdir -p "$CACHE" && ln -sf "$SELF" "$CACHE/dev-up.sh"
 fi
 if [ "$SKILL" = dev-up ]; then
   case "$cmd" in
-    owner|preflight|serve|wait|logs|watch|stop|state|unwatched|-h|--help|help|'') ;;
+    owner|preflight|serve|wait|logs|watch|stop|state|unwatched|_run|_exited|-h|--help|help|'') ;;
     *) say "dev-up: unknown command '$cmd'"; usage; exit 2 ;;
   esac
 fi
 case "$cmd" in
-  owner|serve|wait|logs|watch|stop|state|ab|show|hide|browser|login) need_port "${1:-}" ;;
+  owner|serve|wait|logs|watch|stop|state|ab|show|hide|browser|login|_run|_exited) need_port "${1:-}" ;;
 esac
 case "$cmd" in
   owner) cmd_owner "$1" ;;
   preflight) cmd_preflight "${1:-}" ;;
   serve) cmd_serve "$@" ;;
+  _run) cmd_run "$1" ;;
+  _exited) cmd_exited "$1" ;;
   wait) cmd_wait "$1" ;;
   logs) case "${2:-40}" in ''|*[!0-9]*) die 2 "logs PORT [N]: N must be a number" ;; esac
         tail -n "${2:-40}" "$(f "$1" log)" 2>/dev/null || die 1 "no log for port $1" ;;

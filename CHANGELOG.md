@@ -5,6 +5,17 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `dev-up` e `dev-up-agent-browser`: a unit do servidor não leva mais `$` nas
+  linhas `ExecStart` e `ExecStopPost`. Um `daemon-reload` do systemd 262
+  regrava a unit transitória com cada `$$` dobrado, e o bash da unit lia
+  `$$DEV_UP_LOG` como o próprio PID seguido do nome: cada parada do servidor
+  deixava um arquivo `<pid>DEV_UP_LOG` na pasta do app, a queda não entrava no
+  log e o reinício de um comando com `$` rodava com o PID no lugar da variável.
+  O comando agora fica em `PORT.cmd`, no cache, e as duas linhas chamam o
+  próprio script (`_run PORT` e `_exited PORT`). O teste novo faz o
+  `daemon-reload`, mata o servidor e confere a linha da queda, o reinício e a
+  pasta do app.
+
 - `agent-desktop-omarchy`: novo nome da `use-agent-desktop`, porque o modo
   visível e a instalação dos pacotes dependem do Hyprland e do Omarchy. O
   estado passa a ficar em `~/.cache/agent-desktop-omarchy/`. O `type` espera
