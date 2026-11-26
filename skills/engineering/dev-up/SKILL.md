@@ -54,10 +54,15 @@ command.
   Paste the whole path on every call.
 - In a session isolated in a worktree, run the script from that worktree. A `cd` to the main
   checkout is refused with "Run the plain command from <worktree>".
+- Cookies ignore the port: every server on `localhost` shares one cookie jar. Two apps that use
+  the same cookie name, such as two worktrees of one repo each with its own database, overwrite
+  each other's login, so a login on one port logs the other out or shows the other port's user
+  for a minute. The app URL is therefore `http://PORT.localhost:PORT`: Chrome resolves every
+  `*.localhost` name to this machine and keeps a separate cookie jar per host.
 - Serving a port other than the one a `warn pinned port` line names breaks login: Better Auth
   trusts only the origin in `BETTER_AUTH_URL`, and sign-in on the new port answers 403
   `Invalid origin`. Prefix the dev command with every variable the `warn` lines name, pointed at
-  the served port: `BETTER_AUTH_URL=http://localhost:PORT next dev -p PORT`.
+  the app URL: `BETTER_AUTH_URL=http://PORT.localhost:PORT next dev -p PORT`.
 
 ## 1. Who holds the port
 
@@ -152,9 +157,9 @@ Arm one Monitor: command `bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh watch PORT`
      Miss → `AskUserQuestion` with the local devices, then write both lines for the pick. Copy the
      `deviceId` from a fresh `list_connected_browsers`, since `switch_browser` returns none.
 2. Tab. Every call here waits for the previous one to return, on the same tab:
-   1. `tabs_context_mcp` with `createIfEmpty: true`. Reuse a tab already at `localhost:PORT`, else
+   1. `tabs_context_mcp` with `createIfEmpty: true`. Reuse a tab already at `PORT.localhost:PORT`, else
       `tabs_create_mcp`.
-   2. One `browser_batch`: `navigate` to `http://localhost:PORT`, `read_console_messages`,
+   2. One `browser_batch`: `navigate` to `http://PORT.localhost:PORT`, `read_console_messages`,
       `read_network_requests`, `navigate` to the root again, the title call below,
       `tabs_context_mcp`. The first
       `navigate` takes a new tab off `chrome://newtab`, where the reads fail. The two reads start
@@ -170,8 +175,8 @@ Arm one Monitor: command `bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh watch PORT`
       `pattern: "error|failed|exception"`), `read_network_requests` (`urlPattern: "/api"` or the
       app's data origin), and `javascript_tool` with `document.visibilityState`.
    5. `state PORT set tab_id=<id>`. This is `TARGET_TAB_ID`, the only tab you act on, and it stays
-      on `localhost:PORT`. Another server or a prototype gets a new tab, created before you close
-      an older one. Leave `localhost` tabs on other ports and the tab group itself alone. When
+      on `PORT.localhost:PORT`. Another server or a prototype gets a new tab, created before you close
+      an older one. Leave tabs on other ports or hosts and the tab group itself alone. When
       `tabs_context_mcp` stops listing `TARGET_TAB_ID`, the group was recreated: open a tab at the
       root and set `tab_id` again.
 
@@ -205,8 +210,8 @@ found, or `hidden`, which means screenshots and clicks stall until the user brin
 
 ## Restart
 
-For new code, a new `.env`, or another worktree on the same port. Keep the port: the login cookie
-belongs to `host:port`, so a new port logs the user out.
+For new code, a new `.env`, or another worktree on the same port. Keep the port: the app URL
+`PORT.localhost:PORT` holds the login cookie, so a new port logs the user out.
 
 1. `owner PORT`. With `via=dev-up` or `mine=orphan`, `stop PORT`. With `via=other`, leave it
    running: serve on the next port `owner` calls `FREE` and tell the user the real port. When that

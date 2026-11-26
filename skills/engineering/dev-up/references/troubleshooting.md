@@ -31,7 +31,7 @@ answering.
 ## The app runs but behaves wrong
 
 - OAuth returns to the production domain (a Supabase Site URL, a Google redirect URI). Copy the
-  `?code=...` from that URL onto `http://localhost:PORT/<callback route>?code=...` in the same tab.
+  `?code=...` from that URL onto `http://PORT.localhost:PORT/<callback route>?code=...` in the same tab.
   The code works once and expires in minutes.
 - An edited CSS file changes nothing in the tab. A Tailwind `--watch` inside the dev script can
   stop without logging an error. Compare the mtime of the generated CSS with the source before you

@@ -5,6 +5,13 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `dev-up`: o endereço do app passa a ser `http://PORT.localhost:PORT`, na aba
+  e nas variáveis de origem (`BETTER_AUTH_URL`). O cookie não separa por porta:
+  dois worktrees do mesmo repo em `localhost`, cada um com o próprio banco,
+  gravavam o mesmo cookie de sessão, e o login numa porta derrubava o da outra
+  ou mostrava o usuário dela por um minuto. O Chrome resolve `*.localhost` para
+  a própria máquina e guarda os cookies de cada host em separado.
+
 - `dev-up` e `dev-up-agent-browser`: a unit do servidor não leva mais `$` nas
   linhas `ExecStart` e `ExecStopPost`. Um `daemon-reload` do systemd 262
   regrava a unit transitória com cada `$$` dobrado, e o bash da unit lia

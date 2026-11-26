@@ -12,7 +12,7 @@ as `SKILL.md` spells it, with the skill's base directory filled in.
    process manager) or it ignores SIGTERM: tell the user and leave it.
 3. `TaskStop` the `watcher_task` when `watcher_alive=yes`.
 4. Close the tab with `tabs_close_mcp`, only when the recorded `tab_id` appears in a fresh
-   `tabs_context_mcp` list on `localhost:PORT`. A recorded id can point at another URL by now, and
+   `tabs_context_mcp` list on `PORT.localhost:PORT`. A recorded id can point at another URL by now, and
    matching by what looks like yours once closed the wrong tab. Leave the group itself alone.
    Closing the last tab of the group removes the group, so when you cannot tell whether other tabs
    remain, navigate it to `about:blank` instead.
