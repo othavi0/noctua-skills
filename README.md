@@ -2,15 +2,15 @@
 
 [![skills.sh](https://skills.sh/b/othavi0/noctua-skills)](https://skills.sh/othavi0/noctua-skills)
 
-Five Claude Code skills I use every day, packaged to drop into any project. Each
+Six Claude Code skills I use every day, packaged to drop into any project. Each
 one started as a bug I hit twice, and gets cut the moment it stops earning its
 place.
 
 A skill is a folder with a `SKILL.md`: YAML frontmatter plus instructions. Claude
 Code reads the `description` to decide when to reach for it; the body guides the
 run. Heavier material loads on demand from `references/`, so the trigger stays
-cheap. Fork them. `dev-up` and `dev-up-agent-browser` read their own folder name to pick
-their cache, so keep those two names.
+cheap. Fork them. `dev-up`, `dev-up-agent-browser` and `browse-up` read their own folder
+name to pick their cache, so keep those three names.
 
 ## Quickstart
 
@@ -25,7 +25,7 @@ Claude Code.
 Prefer to install by hand? Clone the repo and copy a skill folder into
 `~/.claude/skills` (global) or `.claude/skills` (one project).
 
-`dev-up`, `dev-up-agent-browser`, `agent-desktop-omarchy` and `nuvem` are model-invoked. Type them as a slash command
+`dev-up`, `dev-up-agent-browser`, `browse-up`, `agent-desktop-omarchy` and `nuvem` are model-invoked. Type them as a slash command
 (`/dev-up 3000`) or let Claude reach for them when the task fits the description.
 `humanize-pt-br` runs only when you type it.
 
@@ -55,6 +55,20 @@ measured on a 16 GB machine. `dash` streams every session live in one page,
 relaunches the browser whenever two calls disagree on their launch options, and
 the window that comes back steals your focus. On Hyprland, one window rule
 keeps the visible window from ever pulling you to its workspace.
+
+**[browse-up](./skills/engineering/browse-up/SKILL.md)** is `dev-up` rebuilt on
+[Browse](https://opencode.ai/product/browse), after I read every past `dev-up`
+session to see where the runs lost time. The server, the watcher and the
+port-as-key stay. The tab is now `dev-PORT`, an id the agent picks, so nothing
+tracks a tab id, selects a browser or patches the tab title. A browser call
+through Browse measured about 70 ms here, against about 850 ms through Claude in
+Chrome. The biggest complaint in those sessions was login: the old skill told me
+to type the test password, and I asked the agent to do it eight times. Now the
+password goes from the project's seed to the form through a file the agent never
+reads into the conversation, and a real account or a 2FA prompt goes back to me
+with `handoff`. The skill and its references take 364 lines, against 412 in
+`dev-up`, with the rules for driving the tab moved into `SKILL.md`. Needs the Browse extension
+and its MCP server (`browse install -a claude`).
 
 **[agent-desktop-omarchy](./skills/engineering/agent-desktop-omarchy/SKILL.md)** exists
 because a Wayland desktop has one keyboard, and it is yours.

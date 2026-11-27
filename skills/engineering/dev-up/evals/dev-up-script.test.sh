@@ -203,6 +203,20 @@ CLAUDE_CODE_SESSION_ID=session-h "$DU" state $P init >/dev/null
 hook=$(sed -n "s/^ *command: '\(.*\)'$/\1/p" "$HERE/SKILL.md")
 check "the hook reaches the script through the cache pointer" "$(printf '{"session_id":"session-h"}' | bash -c "$hook")" "*server on port $P is down*"
 check "the hook is silent for other sessions" "$(printf '{"session_id":"session-x"}' | bash -c "$hook")" ""
+# A listener that is an ancestor of the script (the agent harness) is not this checkout's server.
+PH=$((P + 7))
+out=$(cd "$T/app" && python3 - "$DU" "$PH" <<'PY'
+import socket, subprocess, sys
+du, port = sys.argv[1], sys.argv[2]
+s = socket.socket(); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1); s.bind(("127.0.0.1", int(port))); s.listen()
+for args in (["owner", port], ["preflight"], ["preflight", "--dir", "."]):
+    r = subprocess.run(["bash", du, *args], capture_output=True, text=True)
+    print(args[0], "|", " ".join(l for l in r.stdout.splitlines() if l.startswith(("BUSY", "warn served", "ok checkout"))))
+PY
+)
+check "owner calls a harness listener foreign" "$(printf '%s\n' "$out" | sed -n 1p)" "owner | BUSY pid=* mine=no via=other *"
+check "preflight skips a harness listener" "$(printf '%s\n' "$out" | sed -n 2p)" "preflight | ok checkout $T/app worktree=no"
+check "preflight takes --dir" "$(printf '%s\n' "$out" | sed -n 3p)" "preflight | ok checkout $T/app worktree=no"
 check "help prints the whole header" "$("$DU" help | tail -1)" "# Exit codes: *"
 check "an unknown command lists every command" "$("$DU" bogus | grep -c 'unwatched')" "1"
 TWIN="$HERE/../dev-up-agent-browser/scripts/dev-up.sh"

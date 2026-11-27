@@ -5,6 +5,25 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `browse-up`: skill nova. É o `dev-up` com o [Browse](https://opencode.ai/product/browse)
+  no lugar do Claude in Chrome, escrita depois de ler as sessões em que o
+  `dev-up` rodou. A aba tem o id fixo `dev-PORT`, então saem a escolha do
+  navegador, o `tab_id` no estado e o script do título, que nessas sessões
+  rodou em 3 de 13 navegações e ninguém percebeu a falta. O login de usuário de
+  teste passa a ser do agente: a senha vai da fonte do projeto para o formulário
+  por um arquivo do Browse, sem entrar na conversa. Conta real, 2FA e captcha
+  voltam para o user com `handoff`. As regras de uso da aba, que ficavam num
+  arquivo de referência nunca aberto, sobem para o `SKILL.md`. Estado em
+  `~/.cache/browse-up/`.
+
+- `dev-up`, `dev-up-agent-browser` e `browse-up`: o `owner` e o `preflight` não
+  tratam mais a porta do próprio Claude Code como servidor do projeto. O
+  processo que roda o script escuta numa porta a partir da mesma pasta, e o
+  `preflight` avisava `warn served` com essa porta em toda sessão. A regra da
+  skill mandava usar essa porta sem perguntar. Um listener que é ancestral do
+  script agora sai como `mine=no` no `owner` e é pulado no `preflight`. O
+  `preflight` aceita `--dir DIR`, que os agentes tentaram em mais de uma sessão.
+
 - `dev-up`: o endereço do app passa a ser `http://PORT.localhost:PORT`, na aba
   e nas variáveis de origem (`BETTER_AUTH_URL`). O cookie não separa por porta:
   dois worktrees do mesmo repo em `localhost`, cada um com o próprio banco,

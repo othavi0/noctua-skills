@@ -1,0 +1,16 @@
+[
+  {"query": "/browse-up 3000", "should_trigger": true},
+  {"query": "sobe o dev server na porta 3001 e abre no Browse", "should_trigger": true},
+  {"query": "start the dev server on port 5173 and open it in my Brave through browse", "should_trigger": true},
+  {"query": "restart the app on port 3000 and reload the browse tab", "should_trigger": true},
+  {"query": "usa o browse do opencode pra abrir o app dessa worktree na 3004 e fica de olho no log", "should_trigger": true},
+  {"query": "serve this project on port 8000 with the browse MCP and watch the log for crashes", "should_trigger": true},
+  {"query": "/dev-up 3000", "should_trigger": false},
+  {"query": "/dev-up-agent-browser 3000", "should_trigger": false},
+  {"query": "open the app on port 3000 in Claude in Chrome", "should_trigger": false},
+  {"query": "test the checkout flow headless with agent-browser on port 3002", "should_trigger": false},
+  {"query": "use browse to read the pricing page of example.com", "should_trigger": false},
+  {"query": "who is holding port 8081", "should_trigger": false},
+  {"query": "explain how to configure Vite to bind on a custom port", "should_trigger": false},
+  {"query": "run our test suite and tell me which tests fail", "should_trigger": false}
+]
