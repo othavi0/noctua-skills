@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
-# dev-up.sh: the mechanical half of the dev-up and dev-up-agent-browser skills. One dev server per
-# port, one log, one state file; under dev-up-agent-browser, also one agent-browser session per
-# port. Both skills ship this same file, byte for byte. It reads which skill it serves from the
-# folder above scripts/ (symlinks resolved), so each skill keeps its own cache and state keys, and
-# both run side by side.
+# dev-up.sh: the mechanical half of the dev-up, dev-up-agent-browser and browse-up skills. One dev
+# server per port, one log, one state file; under dev-up-agent-browser, also one agent-browser
+# session per port. The three skills ship this same file, byte for byte. It reads which skill it
+# serves from the folder above scripts/ (symlinks resolved), so each skill keeps its own cache and
+# state keys, and all three run side by side.
 #
 # Usage: dev-up.sh <command> [PORT] [args]
 #   owner PORT            FREE | BUSY pid=N cwd=DIR mine=yes|worktree|orphan|no|? via=dev-up|other
 #                         state=mine|other|none. orphan: the listener's cwd was deleted. Exits 0 on
 #                         FREE and on mine=yes, 1 otherwise.
 #   preflight [DIR]       what this checkout needs before launch: run/todo/warn lines. warn served:
-#                         a listener already runs from DIR
+#                         a listener already runs from DIR. --dir DIR works too. A listener that
+#                         is an ancestor of this script is the agent harness: owner says mine=no
+#                         for it and preflight skips it
 #   serve PORT [--dir DIR] [--mem SIZE] [--swap SIZE] -- CMD
 #                         start CMD (one shell string) as the systemd user unit dev-up-PORT, logging
 #                         to PORT.log, and return: STARTED unit=dev-up-PORT log=FILE. The unit gets
@@ -28,7 +30,7 @@
 #   state PORT init | show | get KEY | set KEY=VALUE... | pause | resume | exclude 'TEXT' | rm
 #   unwatched             for the UserPromptSubmit hook: this session's dead servers, and the errors
 #                         logged since the last prompt when the watcher is gone
-# Only under dev-up-agent-browser (dev-up answers "unknown command"):
+# Only under dev-up-agent-browser (dev-up and browse-up answer "unknown command"):
 #   ab PORT ARGS...       run agent-browser ARGS in the port's session (devup-PORT) with the same
 #                         launch options on every call, so the daemon never relaunches the browser.
 #                         A headless session shuts down after 30 min idle (DEV_UP_AB_IDLE changes it);
@@ -57,9 +59,11 @@
 # file per repo, named after its origin URL (host/owner/repo), else its git common dir, so every
 # worktree and clone of a repo finds the same one. Lines: cmd=CMD and an optional user=DEFAULT.
 #
-# Files in ~/.cache/dev-up (dev-up) or ~/.cache/dev-up-ab (dev-up-agent-browser): PORT.log,
+# Files in ~/.cache/dev-up (dev-up), ~/.cache/dev-up-ab (dev-up-agent-browser) or ~/.cache/browse-up
+# (browse-up): PORT.log,
 # PORT.cmd (the command serve started, which the unit reads),
-# PORT.state (session dir watcher_task, plus tab_id or ab_mode), PORT.watch (watch), PORT.paused,
+# PORT.state (session dir watcher_task, plus tab_id under dev-up or ab_mode under
+# dev-up-agent-browser), PORT.watch (watch), PORT.paused,
 # PORT.exclude (fixed strings, one per line), PORT.hookoff (log offset at the last prompt).
 # Exit codes: 0 ok, 1 negative verdict, 2 usage, 3 refused.
 set -uo pipefail
@@ -68,6 +72,8 @@ SELF=$(readlink -f "$0" 2>/dev/null)
 SKILL=$(basename "$(dirname "$(dirname "${SELF:-$0}")")")
 if [ "$SKILL" = dev-up-agent-browser ]; then
   CACHE="${DEV_UP_CACHE:-$HOME/.cache/dev-up-ab}" KEYS="session dir watcher_task ab_mode"
+elif [ "$SKILL" = browse-up ]; then
+  CACHE="${DEV_UP_CACHE:-$HOME/.cache/browse-up}" KEYS="session dir watcher_task"
 else
   SKILL=dev-up CACHE="${DEV_UP_CACHE:-$HOME/.cache/dev-up}" KEYS="session dir watcher_task tab_id"
 fi
@@ -117,6 +123,16 @@ restarting() {
 }
 last_fall() { grep '^dev-up: server exited' "$(f "$1" log)" 2>/dev/null | tail -1; }
 in_unit() { [ -n "${1:-}" ] && grep -qE "/$(unit "$2")\.service\$" "/proc/$1/cgroup" 2>/dev/null; }
+# The agent harness that runs this script can listen on a port of its own from the same directory
+# (Claude Code does). It is no dev server: owner calls it foreign and preflight skips it.
+ancestor() {
+  local p=$$ n=0
+  while [ "${p:-0}" -gt 1 ] && [ "$n" -lt 64 ]; do
+    [ "$p" = "$1" ] && return 0
+    p=$(sed -n 's/^PPid:[[:space:]]*//p' "/proc/$p/status" 2>/dev/null); n=$((n + 1))
+  done
+  return 1
+}
 orphan() { case "$1" in *' (deleted)') [ ! -d "$1" ]; return ;; esac; return 1; }
 
 tree() {
@@ -150,7 +166,8 @@ cmd_owner() {
   [ -n "$pid" ] || { say "BUSY pid=? cwd=? mine=? via=other state=$(state_owner "$port")"; return 1; }
   cwd=$(proc_cwd "$pid")
   here=$(toplevel "$PWD")
-  if orphan "$cwd"; then mine=orphan
+  if ancestor "$pid"; then mine=no
+  elif orphan "$cwd"; then mine=orphan
   elif [ -n "$cwd" ] && [ "$(toplevel "$cwd")" = "$here" ]; then mine=yes
   elif [ -n "$cwd" ] && [ -n "$(common_dir "$PWD")" ] && [ "$(common_dir "$cwd")" = "$(common_dir "$PWD")" ]; then mine=worktree
   fi
@@ -169,6 +186,7 @@ cmd_preflight() {
   say "ok checkout $top worktree=$wt"
   local lport lpid
   while read -r lport lpid; do
+    ancestor "$lpid" && continue
     [ "$(proc_cwd "$lpid")" = "$dir" ] && say "warn served: this directory already serves port $lport (pid $lpid)"
   done < <(listeners)
 
@@ -642,7 +660,7 @@ cmd="${1:-}"; [ $# -gt 0 ] && shift
 if [ "$cmd" != unwatched ] && [ "$cmd" != _run ] && [ "$cmd" != _exited ] && [ -n "$SELF" ] && [ "$SELF" != "$CACHE/dev-up.sh" ]; then
   mkdir -p "$CACHE" && ln -sf "$SELF" "$CACHE/dev-up.sh"
 fi
-if [ "$SKILL" = dev-up ]; then
+if [ "$SKILL" != dev-up-agent-browser ]; then
   case "$cmd" in
     owner|preflight|serve|wait|logs|watch|stop|state|unwatched|_run|_exited|-h|--help|help|'') ;;
     *) say "dev-up: unknown command '$cmd'"; usage; exit 2 ;;
@@ -653,7 +671,7 @@ case "$cmd" in
 esac
 case "$cmd" in
   owner) cmd_owner "$1" ;;
-  preflight) cmd_preflight "${1:-}" ;;
+  preflight) [ "${1:-}" = --dir ] && shift; cmd_preflight "${1:-}" ;;
   serve) cmd_serve "$@" ;;
   _run) cmd_run "$1" ;;
   _exited) cmd_exited "$1" ;;
