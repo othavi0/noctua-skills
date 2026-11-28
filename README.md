@@ -64,7 +64,7 @@ tracks a tab id, selects a browser or patches the tab title. A browser call
 through Browse measured about 70 ms here, against about 850 ms through Claude in
 Chrome. The biggest complaint in those sessions was login: the old skill told me
 to type the test password, and I asked the agent to do it eight times. Now the
-password goes from the project's seed to the form through a file the agent never
+password goes from the project's seed to the page through a file the agent never
 reads into the conversation, and a real account or a 2FA prompt goes back to me
 with `handoff`. The skill and its references take 364 lines, against 412 in
 `dev-up`, with the rules for driving the tab moved into `SKILL.md`. Needs the Browse extension
