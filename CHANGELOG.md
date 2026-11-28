@@ -5,6 +5,14 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `browse-up`: ajustes do primeiro run num projeto real. O login de usuário de
+  teste passa a ir por `fetch` ao endpoint de login do app, de dentro da página:
+  o envio do formulário abria o popup de salvar senha do navegador, que
+  bloqueava o Browse na aba até o user fechar. O formulário fica como reserva.
+  O `warn pinned port` agora é explicado pelo host: o prefixo com
+  `PORT.localhost` vale mesmo quando o `.env` já aponta para a porta servida. A
+  skill avisa que um app pode desligar o OAuth fora de `localhost` puro.
+
 - `browse-up`: skill nova. É o `dev-up` com o [Browse](https://opencode.ai/product/browse)
   no lugar do Claude in Chrome, escrita depois de ler as sessões em que o
   `dev-up` rodou. A aba tem o id fixo `dev-PORT`, então saem a escolha do

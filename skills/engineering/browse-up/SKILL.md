@@ -68,10 +68,14 @@ take a screenshot.
 1. Find the app directory. In a monorepo, that is the workspace whose `dev` script starts the app
    the user means. Ask with `AskUserQuestion` only when two or more fit.
 2. `preflight <app dir>`. Run every `run` line. A `todo` line needs a decision.
-   - `warn pinned port` → an auth or CORS origin in `.env` expects another port. Keep the user's
-     port and prefix the dev command with each variable the line names, set to the app URL:
-     `BETTER_AUTH_URL=http://PORT.localhost:PORT next dev -p PORT`. Without the prefix, sign-in
-     answers 403 `Invalid origin`.
+   - `warn pinned port` → an auth or CORS origin in `.env` names a `localhost` URL. Prefix the
+     dev command with each variable the line names, set to the app URL:
+     `BETTER_AUTH_URL=http://PORT.localhost:PORT next dev -p PORT`. The prefix is for the host,
+     so add it even when the line names the port you serve. Without it, sign-in answers 403
+     `Invalid origin`.
+     The log then says that OAuth is off or the issuer is not loopback → the app accepts OAuth
+     only on plain `localhost`. Tell the user in one line. Username and password login still
+     works.
    - `warn served` → this directory already runs a dev server on another port, and Next 16 allows
      one per folder. Use that port: `state PORT rm`, say the real port in one line, and return to
      step 1 with it.
