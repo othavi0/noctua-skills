@@ -1,8 +1,8 @@
 ---
 name: browse-up
 description: >-
-  Starts this project's dev server on one port as a systemd user unit, opens one tab on it in the
-  user's own browser through Browse (the `browse` MCP server), and arms a log watcher. Use for
+  Starts this project's dev server on one port as a systemd user unit and opens one tab on it in
+  the user's own browser through Browse (the `browse` MCP server), logged in as a test user. Use for
   `/browse-up [port]`, or when asked to start, restart, open or watch this project's dev server
   with Browse. Not for Claude in Chrome (dev-up) or headless testing (dev-up-agent-browser).
 # argument-hint, allowed-tools and hooks are Claude Code fields, not part of the Agent Skills spec.
@@ -15,6 +15,8 @@ allowed-tools:
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh logs *)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh watch *)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh state *)
+  - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh port)
+  - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh profile)
 hooks:
   UserPromptSubmit:
     - hooks:
@@ -24,8 +26,7 @@ hooks:
 
 # browse-up
 
-One dev server on one **port**, one **tab** on that port, one **watcher** on the log. The port is
-the key to all three:
+One dev server on one **port**, and one **tab** on that port. The port is the key to both:
 
 - The server is the systemd user unit `dev-up-PORT`.
 - The tab has the Browse id `dev-PORT`. Pass that id as `tab` to every `browse` call.
@@ -39,8 +40,24 @@ the checkout this session works in. A path held in a variable or inside `eval` m
 `allowed-tools`, and a worktree session refuses it. Each command prints its verdict on the first
 line.
 
-With no argument, use the live port that `state` already records for this checkout and say so in
-one line. With none recorded, ask for the port.
+Two things outlive the run, so the next one starts from them:
+
+- The **profile** holds what this repo needs: app directory, dev command, login. Every worktree of
+  the repo reads the same file. `profile` prints it.
+- Each checkout keeps its **port**. `port` prints the one this checkout used last, so a worktree
+  returns to the host that holds its login cookie.
+
+## 0. Port and profile
+
+Run `port` and `profile`.
+
+- An argument names the port → use it.
+- `PORT n` → use `n` and say so in one line.
+- `NO_PORT` → start from the profile's `port`, else the port in the manifest's `dev` script. Step 1
+  walks up from there to a `FREE` one. Ask only when neither source names a port.
+- `PROFILE file=F` → the lines below it replace steps 2.1 and 2.3 and the discovery in
+  [`references/login.md`](references/login.md). Replace `PORT` in them with the port.
+- `NO_PROFILE file=F` → discover as the steps say, then write `F` in step 4.
 
 ## Back in the middle of a run
 
@@ -65,7 +82,7 @@ take a screenshot.
 
 ## 2. Start the server
 
-1. Find the app directory. In a monorepo, that is the workspace whose `dev` script starts the app
+1. Find the app directory, from the profile's `app_dir` when there is one. In a monorepo, that is the workspace whose `dev` script starts the app
    the user means. Ask with `AskUserQuestion` only when two or more fit.
 2. `preflight <app dir>`. Run every `run` line. A `todo` line needs a decision.
    - `warn pinned port` → an auth or CORS origin in `.env` names a `localhost` URL. Prefix the
@@ -79,7 +96,8 @@ take a screenshot.
    - `warn served` → this directory already runs a dev server on another port, and Next 16 allows
      one per folder. Use that port: `state PORT rm`, say the real port in one line, and return to
      step 1 with it.
-3. Build the dev command from the manifest's `dev` script. Pin the port with the framework's flag
+3. Build the dev command, from the profile's `dev` line when there is one, else from the
+   manifest's `dev` script. Pin the port with the framework's flag
    (`--port`, `-p`, plus `--strictPort` for Vite) or the `PORT` variable. When the script
    hardcodes a port, run the script's own command with the number swapped and its env prefix
    kept. Leave `package.json` as it is.
@@ -99,32 +117,15 @@ take a screenshot.
 Every server this session starts goes through `serve` and stops through `stop PORT`, a prototype
 on another port included. A `pkill -f` by name kills this shell too.
 
-## 3. Arm the watcher
+## 3. Open the tab
 
 Load the deferred tools in one call:
 
 ```
-ToolSearch "select:Monitor,TaskStop,mcp__browse__execute,mcp__browse__tabs,mcp__browse__status"
+ToolSearch "select:mcp__browse__execute,mcp__browse__tabs,mcp__browse__status"
 ```
 
 No `mcp__browse__*` tool comes back → [`references/troubleshooting.md`](references/troubleshooting.md).
-
-Arm one Monitor: command `bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh watch PORT`, description
-`errors on port PORT`, `timeout_ms: 1800000`. Then `state PORT set watcher_task=<id from the
-Monitor's return>`.
-
-- A real error → report it. A one-off blip (DNS, one failed external call, a deprecation
-  warning) → ignore it.
-- A line that keeps coming and changes nothing the user sees → `state PORT exclude '<literal text
-  from the line>'`, `TaskStop` the watcher, arm it again.
-- The Monitor expires after 30 minutes. Let it lapse. That wake-up turn repeats the action that
-  waits on the user, or the last result the user has not seen, and nothing about the watcher. The
-  skill's hook prints new log errors on the user's next prompt. Arm it again only while the user
-  tests in the tab.
-- Before you or a subagent edits served code, installs dependencies or runs a migration:
-  `TaskStop` the watcher and `state PORT pause`. Arm it again when typecheck or tests are green.
-
-## 4. Open the tab
 
 1. `tabs` with `action: "new"`, `id: "dev-PORT"`, `url: "http://PORT.localhost:PORT"`,
    `keepOpen: true`. The call is safe to repeat: an existing `dev-PORT` comes back as it is, with
@@ -143,11 +144,48 @@ Monitor's return>`.
 3. The `url` ended on a login route (`/login`, `/auth`, `/sign-in`, `/entrar`, `/acesso`) →
    [`references/login.md`](references/login.md). Log in before you report anything about the page.
 
-## 5. Hand back
+## 4. Hand back
 
-Report the port, the app URL, the log path from `serve`, the tab id `dev-PORT`, the watcher id,
-and the smoke result: clean, or the errors it found. Called as a proof step inside other work,
-the handback is one line in that task's report.
+1. With `NO_PROFILE` in step 0, write the profile to the file it named, now that the run proved
+   each line. Paths are relative to the checkout root, and `PORT` stands for the port:
+
+   ```
+   app_dir: apps/web
+   port: 3001
+   dev: BETTER_AUTH_URL=http://PORT.localhost:PORT next dev --port PORT
+   login: fetch POST /api/auth/sign-in/username {username, password}
+   session: GET /api/auth/get-session → user.username
+   users: .usuarios-teste.json, an object {user: password}; default user teste-admin
+   notes: OAuth is off on PORT.localhost.
+   ```
+
+   The profile names where a password lives and never holds one. A profile line that a run
+   proves wrong → fix that line in the same run.
+2. Report the port, the app URL, the log path from `serve`, the tab id `dev-PORT`, the logged-in
+   user, and the smoke result: clean, or the errors it found. Called as a proof step inside other
+   work, the handback is one line in that task's report.
+
+## Errors in the server log
+
+The skill's hook prints new errors from the server log on the user's next prompt, and says when
+the server is down. That covers a normal run with no watcher. Read `logs PORT` yourself after an
+action in the tab fails.
+
+Arm a watcher only when the user asks to watch the log, or tests in the tab by hand while you
+wait. Load `Monitor` and `TaskStop` with `ToolSearch "select:Monitor,TaskStop"`, then arm one
+Monitor: command `bash ${CLAUDE_SKILL_DIR}/scripts/dev-up.sh watch PORT`, description
+`errors on port PORT`, `timeout_ms: 1800000`. Then `state PORT set watcher_task=<id from the
+Monitor's return>`.
+
+- A real error → report it. A one-off blip (DNS, one failed external call, a deprecation
+  warning) → ignore it.
+- A line that keeps coming and changes nothing the user sees → `state PORT exclude '<literal text
+  from the line>'`. With a watcher armed, `TaskStop` it and arm it again.
+- The Monitor expires after 30 minutes. Let it lapse. That wake-up turn repeats the action that
+  waits on the user, or the last result the user has not seen, and nothing about the watcher.
+- Before you or a subagent edits served code, installs dependencies or runs a migration:
+  `state PORT pause`, and `TaskStop` an armed watcher. `state PORT resume` when typecheck or
+  tests are green.
 
 ## In the tab
 
@@ -162,13 +200,13 @@ got wrong:
 - Check a layout by measuring it. In one `execute`, set the viewport with `browse.emulate`, take
   `page.screenshot({ fullPage: true })`, and compare element boxes with `page.evaluate`. One
   viewport screenshot has passed a broken layout before.
-- The watcher sees the server log only. Client errors stay in the browser: run the smoke script
-  again when a screen looks broken or an action fails.
+- The hook and the watcher see the server log only. Client errors stay in the browser: run the
+  smoke script again when a screen looks broken or an action fails.
 - The first visit to a route compiles it. Give that `page.goto` a `timeout` of 60000.
 - A subagent that drives the app opens its own tab, `dev-PORT-<name>`, and closes it. It never
   stops or restarts the server.
 - `tabs` or `execute` says that no tab has the id `dev-PORT` → the user took the tab back or
-  closed it. Run step 4.1 again.
+  closed it. Run step 3.1 again.
 
 ## Restart
 
@@ -179,10 +217,9 @@ belongs to `PORT.localhost`.
    serve on the next `FREE` port and tell the user the real port.
 2. `state PORT init` from the directory you will serve. For another worktree, `preflight` there.
 3. Launch and wait as in steps 2.4 and 2.5.
-4. Arm the watcher only when `state PORT show` says `watcher_alive=no`. Reload the tab:
-   `await page.goto("http://PORT.localhost:PORT")` on `tab: "dev-PORT"`.
+4. Reload the tab: `await page.goto("http://PORT.localhost:PORT")` on `tab: "dev-PORT"`.
 
 ## Shutting down
 
-Server, watcher and tab stay up until the user asks for a shutdown. Then follow
+Server and tab stay up until the user asks for a shutdown. Then follow
 [`references/shutdown.md`](references/shutdown.md).

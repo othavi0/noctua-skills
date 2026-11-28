@@ -218,6 +218,19 @@ PY
 check "owner calls a harness listener foreign" "$(printf '%s\n' "$out" | sed -n 1p)" "owner | BUSY pid=* mine=no via=other *"
 check "preflight skips a harness listener" "$(printf '%s\n' "$out" | sed -n 2p)" "preflight | ok checkout $T/app worktree=no"
 check "preflight takes --dir" "$(printf '%s\n' "$out" | sed -n 3p)" "preflight | ok checkout $T/app worktree=no"
+export DEV_UP_CACHE="$T/cache2" CLAUDE_CODE_SESSION_ID=session-a; cd "$T/app"
+"$DU" state $P3 init >/dev/null
+check "port names the port this checkout used last" "$("$DU" port)" "PORT $P3"
+check "port has none for another checkout" "$(cd "$T" && "$DU" port; echo "exit=$?")" "NO_PORT*exit=1"
+check "profile has none at first and names the file" "$("$DU" profile; echo "exit=$?")" "NO_PROFILE file=$DEV_UP_CACHE/profiles/*.md*exit=1"
+echo "app_dir: ." >"$("$DU" profile | sed 's/^NO_PROFILE file=//')"
+check "profile prints the file once written" "$("$DU" profile | tr '\n' ' ')" "PROFILE file=*.md app_dir: . "
+echo old >"$DEV_UP_CACHE/1.log"; touch -d '9 days ago' "$DEV_UP_CACHE/1.log"; echo new >"$DEV_UP_CACHE/2.log"
+out=$("$DU" gc)
+check "gc removes a port that is down and old" "$out" "*REMOVED port=1*"
+check "gc keeps a recent port" "$(ls "$DEV_UP_CACHE/2.log" "$DEV_UP_CACHE/1.log" 2>/dev/null | wc -l)" "1"
+check "gc keeps the profile and the ports file" "$("$DU" profile | head -1) $("$DU" port)" "PROFILE * PORT $P3"
+"$DU" state $P3 rm
 check "help prints the whole header" "$("$DU" help | tail -1)" "# Exit codes: *"
 check "an unknown command lists every command" "$("$DU" bogus | grep -c 'unwatched')" "1"
 TWIN="$HERE/../dev-up/scripts/dev-up.sh"

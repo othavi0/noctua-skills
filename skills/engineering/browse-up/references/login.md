@@ -1,6 +1,9 @@
 # Logging in
 
-Read this from [`SKILL.md`](../SKILL.md) step 4.3, or whenever `page.url()` lands on a login route.
+Read this from [`SKILL.md`](../SKILL.md) step 3.3, or whenever `page.url()` lands on a login route.
+
+The profile's `login`, `session` and `users` lines, when `profile` printed them, name the endpoint,
+the session check and the password source. Use them as written and skip the discovery below.
 
 Pick the branch by whose credentials they are.
 

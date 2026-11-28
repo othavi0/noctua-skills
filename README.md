@@ -58,15 +58,17 @@ keeps the visible window from ever pulling you to its workspace.
 
 **[browse-up](./skills/engineering/browse-up/SKILL.md)** is `dev-up` rebuilt on
 [Browse](https://opencode.ai/product/browse), after I read every past `dev-up`
-session to see where the runs lost time. The server, the watcher and the
-port-as-key stay. The tab is now `dev-PORT`, an id the agent picks, so nothing
+session to see where the runs lost time. The server and the port-as-key stay.
+The watcher is opt-in: the prompt hook already prints new log errors. A profile
+per repo keeps the app directory, the dev command and the login endpoint, and
+each worktree keeps its port, so a second run skips the discovery. The tab is now `dev-PORT`, an id the agent picks, so nothing
 tracks a tab id, selects a browser or patches the tab title. A browser call
 through Browse measured about 70 ms here, against about 850 ms through Claude in
 Chrome. The biggest complaint in those sessions was login: the old skill told me
 to type the test password, and I asked the agent to do it eight times. Now the
 password goes from the project's seed to the page through a file the agent never
 reads into the conversation, and a real account or a 2FA prompt goes back to me
-with `handoff`. The skill and its references take 364 lines, against 412 in
+with `handoff`. The skill and its references take 430 lines, against 412 in
 `dev-up`, with the rules for driving the tab moved into `SKILL.md`. Needs the Browse extension
 and its MCP server (`browse install -a claude`).
 

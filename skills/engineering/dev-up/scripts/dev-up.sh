@@ -28,6 +28,13 @@
 #   stop PORT [--force]   stop the unit serve started (systemd sends SIGKILL after 10 s), or an
 #                         orphan listener: STOPPED | STILL_BOUND. --force: any listener
 #   state PORT init | show | get KEY | set KEY=VALUE... | pause | resume | exclude 'TEXT' | rm
+#   port                  the port this checkout used last, which state init records: PORT n |
+#                         NO_PORT (exit 1). Each worktree keeps its own port, and so its own login
+#   profile               what a run needs to know about this repo, written once and shared by
+#                         every worktree and clone: PROFILE file=F and the file | NO_PROFILE file=F
+#                         (exit 1). The agent writes F itself. It holds no password
+#   gc                    delete the files of ports that are down and untouched for 7 days
+#                         (DEV_UP_GC_DAYS): REMOVED port=N lines, then GC removed=N kept=N days=N
 #   unwatched             for the UserPromptSubmit hook: this session's dead servers, and the errors
 #                         logged since the last prompt when the watcher is gone
 # Only under dev-up-agent-browser (dev-up and browse-up answer "unknown command"):
@@ -64,7 +71,8 @@
 # PORT.cmd (the command serve started, which the unit reads),
 # PORT.state (session dir watcher_task, plus tab_id under dev-up or ab_mode under
 # dev-up-agent-browser), PORT.watch (watch), PORT.paused,
-# PORT.exclude (fixed strings, one per line), PORT.hookoff (log offset at the last prompt).
+# PORT.exclude (fixed strings, one per line), PORT.hookoff (log offset at the last prompt),
+# ports (one "PORT<tab>checkout" line per checkout) and profiles/ (one file per repo).
 # Exit codes: 0 ok, 1 negative verdict, 2 usage, 3 refused.
 set -uo pipefail
 
@@ -412,6 +420,7 @@ cmd_state() {
       [ "$(state_get "$port" dir)" = "$(toplevel "$PWD")" ] || rm -f "$(f "$port" exclude)"
       rm -f "$sf" "$(f "$port" paused)"
       state_write "$port" "session=$(session_id)" "dir=$(toplevel "$PWD")"
+      port_record "$port"
       cat "$sf" ;;
     get) state_get "$port" "${1:?state PORT get KEY}" ;;
     set)
@@ -437,6 +446,42 @@ cmd_state() {
     rm) rm -f "$sf" "$(f "$port" watch)" "$(f "$port" paused)" "$(f "$port" exclude)" "$(f "$port" hookoff)" "$(f "$port" pid)" ;;
     *) die 2 "state: unknown op '$op'" ;;
   esac
+}
+
+# The ports file maps each checkout to the port it used last, one "PORT<tab>DIR" line each.
+port_record() {
+  local pf="$CACHE/ports" top tmp; top=$(toplevel "$PWD")
+  tmp=$(mktemp "$pf.XXXXXX") || return 0
+  { [ -f "$pf" ] && awk -F'\t' -v d="$top" '$2 != d' "$pf"; printf '%s\t%s\n' "$1" "$top"; } >"$tmp"
+  mv "$tmp" "$pf"
+}
+
+cmd_port() {
+  local port; port=$(awk -F'\t' -v d="$(toplevel "$PWD")" '$2 == d { p = $1 } END { print p }' "$CACHE/ports" 2>/dev/null)
+  [ -n "$port" ] || { say "NO_PORT"; return 1; }
+  say "PORT $port"
+}
+
+cmd_gc() {
+  local days="${DEV_UP_GC_DAYS:-7}" p port seen=" " removed=0 kept=0 pf="$CACHE/ports" tmp d
+  case "$days" in ''|*[!0-9]*) die 2 "DEV_UP_GC_DAYS must be a number, got '$days'" ;; esac
+  for p in "$CACHE"/[0-9]*.*; do
+    [ -f "$p" ] || continue
+    port=$(basename "$p"); port=${port%%.*}
+    case "$port" in *[!0-9]*) continue ;; esac
+    case "$seen" in *" $port "*) continue ;; esac
+    seen="$seen$port "
+    if bound "$port" || served "$port" || [ -n "$(find "$CACHE" -maxdepth 1 -name "$port.*" -mtime -"$days" 2>/dev/null | head -1)" ]; then
+      kept=$((kept + 1)); continue
+    fi
+    rm -f "$CACHE/$port".*
+    say "REMOVED port=$port"; removed=$((removed + 1))
+  done
+  if [ -f "$pf" ] && tmp=$(mktemp "$pf.XXXXXX"); then
+    while IFS=$'\t' read -r port d; do [ -d "$d" ] && printf '%s\t%s\n' "$port" "$d"; done <"$pf" >"$tmp"
+    mv "$tmp" "$pf"
+  fi
+  say "GC removed=$removed kept=$kept days=$days"
 }
 
 cmd_unwatched() {
@@ -613,6 +658,13 @@ repo_key() {
 recipe_file() { local k; k=$(repo_key); say "$CONFIG_DIR/logins/$(printf '%s' "$k" | tr -c 'A-Za-z0-9._-' '_')"; }
 recipe_get() { sed -n "s/^$1=//p" "$(recipe_file)" 2>/dev/null | tail -1; }
 no_recipe() { say "NO_RECIPE key=$(repo_key) file=$(recipe_file)"; return 1; }
+profile_file() { local k; k=$(repo_key); say "$CACHE/profiles/$(printf '%s' "$k" | tr -c 'A-Za-z0-9._-' '_').md"; }
+cmd_profile() {
+  local pf; pf=$(profile_file)
+  mkdir -p "$CACHE/profiles"
+  [ -s "$pf" ] || { say "NO_PROFILE file=$pf"; return 1; }
+  say "PROFILE file=$pf"; cat "$pf"
+}
 cmd_recipe() {
   local op="${1:-show}" rf; rf=$(recipe_file)
   case "$op" in
@@ -662,7 +714,7 @@ if [ "$cmd" != unwatched ] && [ "$cmd" != _run ] && [ "$cmd" != _exited ] && [ -
 fi
 if [ "$SKILL" != dev-up-agent-browser ]; then
   case "$cmd" in
-    owner|preflight|serve|wait|logs|watch|stop|state|unwatched|_run|_exited|-h|--help|help|'') ;;
+    owner|preflight|serve|wait|logs|watch|stop|state|port|profile|gc|unwatched|_run|_exited|-h|--help|help|'') ;;
     *) say "dev-up: unknown command '$cmd'"; usage; exit 2 ;;
   esac
 fi
@@ -681,6 +733,9 @@ case "$cmd" in
   watch) cmd_watch "$1" ;;
   stop) cmd_stop "$1" "${2:-}" ;;
   state) cmd_state "$@" ;;
+  port) cmd_port ;;
+  profile) cmd_profile ;;
+  gc) cmd_gc ;;
   unwatched) cmd_unwatched ;;
   ab) cmd_ab "$@" ;;
   show) cmd_switch "$1" headed ;;
