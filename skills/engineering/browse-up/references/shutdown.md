@@ -10,10 +10,12 @@ as [`SKILL.md`](../SKILL.md) spells it, with the skill's base directory filled i
    - `via=other` → the server was running before this skill. Leave it up unless the user names
      it. Then `S stop PORT --force`. `STILL_BOUND` after `--force` means a supervisor respawns it
      (a `turbo dev` in a terminal, a process manager): tell the user and leave it.
-3. `TaskStop` the `watcher_task` when `watcher_alive=yes`.
+3. `TaskStop` the `watcher_task` when `watcher_alive=yes`. A run with no watcher skips this.
 4. Close the tab: `tabs` with `action: "close"`, `tab: "dev-PORT"`. Close any `dev-PORT-<name>`
    tab a subagent left in the `tabs` list too. Leave every other tab alone.
 5. `S state PORT rm`. The log stays for later reading. The next `serve` rotates it.
+6. `S gc`. It deletes the files of ports that are down and untouched for 7 days, and prints each
+   one. The profile and each checkout's port stay.
 
 ## A state file from another session
 

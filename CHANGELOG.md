@@ -5,6 +5,17 @@ Sem versionamento por tag ainda, este arquivo acompanha o `main`.
 
 ## [Unreleased]
 
+- `browse-up`: menos retrabalho entre runs. Um perfil por repo
+  (`dev-up.sh profile`) guarda a pasta do app, o comando de dev, o endpoint de
+  login e a fonte dos usuários de teste; o agente escreve o arquivo no fim do
+  primeiro run e todo worktree do repo lê o mesmo. Cada checkout lembra a
+  própria porta (`dev-up.sh port`), então `/browse-up` sem argumento não
+  pergunta mais. O watcher deixa de ser armado por padrão: no run real ele
+  expirou em 30 minutos sem evento, e o hook já mostra os erros novos do log no
+  próximo prompt. `dev-up.sh gc` apaga os arquivos de portas paradas há 7 dias,
+  e o desligamento chama esse comando. Os três comandos existem no script das
+  três skills; só a `browse-up` os usa.
+
 - `browse-up`: ajustes do primeiro run num projeto real. O login de usuário de
   teste passa a ir por `fetch` ao endpoint de login do app, de dentro da página:
   o envio do formulário abria o popup de salvar senha do navegador, que

@@ -71,7 +71,7 @@ the login route, means the server is fine.
 - A call says that no browser is connected → call `status`, pass its `nextStep` to the user, and
   wait. Do not retry in a loop.
 - No tab has the id `dev-PORT` → the user took the tab back with the Browse toolbar button, or
-  closed it. Open it again with [`SKILL.md`](../SKILL.md) step 4.1.
+  closed it. Open it again with [`SKILL.md`](../SKILL.md) step 3.1.
 - `net::ERR_CONNECTION_REFUSED` on `page.goto` → the server is down. `owner PORT` and
   `logs PORT`.
 - A call fails with a dialog's message → an `alert`, `confirm` or `prompt` is open and the page
